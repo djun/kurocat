@@ -4,6 +4,7 @@ mod cats;
 mod config;
 mod input_hook;
 mod mcp;
+mod media;
 mod privacy;
 mod tray;
 mod updater;
@@ -1588,6 +1589,7 @@ pub fn run() {
 
             tray::setup_tray(&handle, &s)?;
             input_hook::start_global_hooks(handle.clone());
+            media::start_media_watcher(handle.clone());
             privacy::start_password_privacy_watcher(
                 handle.clone(),
                 settings_for_setup.clone(),

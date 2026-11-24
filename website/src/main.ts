@@ -4,25 +4,28 @@ import type { KeyboardLayoutId } from '../../src/keyboardLayout';
 import { BUILTIN_WEB_CATS } from './builtinCats';
 import { keyboardEventToVk } from './webKeyMap';
 
-const LOCAL_MIRROR_VERSION = 'v4.7.0';
-const LOCAL_MIRROR_VER_NUM = '4.7.0';
-const MACOS_MIRROR_VERSION = 'v4.7.0';
+const GITHUB_REPO = 'xpfyg/kurocat';
+const DEFAULT_RELEASE_TAG = 'v4.7.0';
+const DEFAULT_VERSION = '4.7.0';
 
-interface ReleaseAssetMap {
-  win65: { name: string; primaryUrl: string; ghUrl: string; sizeText: string };
-  macos: { name: string; primaryUrl: string; ghUrl: string; sizeText: string };
+interface ReleaseAsset {
+  name: string;
+  url: string;
+  sizeText: string;
+}
+
+type ReleaseAssetMap = Record<'win65' | 'macos', ReleaseAsset>;
+
+function releaseAssetUrl(tag: string, name: string): string {
+  return `https://github.com/${GITHUB_REPO}/releases/download/${tag}/${name}`;
 }
 
 function buildDefaultAssets(): ReleaseAssetMap {
-  const localBase = `/kurocat/releases/${LOCAL_MIRROR_VERSION}`;
-  const ghBase = `https://github.com/qianyiai/kurocat/releases/download/${LOCAL_MIRROR_VERSION}`;
-  const macLocalBase = `/kurocat/releases/${MACOS_MIRROR_VERSION}`;
-  const macGhBase = `https://github.com/qianyiai/kurocat/releases/download/${MACOS_MIRROR_VERSION}`;
-  const n65 = `KuroCat-${LOCAL_MIRROR_VER_NUM}-x64-setup.exe`;
-  const nMac = `KuroCat-${MACOS_MIRROR_VERSION}-macos-universal.dmg`;
+  const winName = `KuroCat-${DEFAULT_VERSION}-x64-setup.exe`;
+  const macName = `KuroCat-${DEFAULT_RELEASE_TAG}-macos-universal.dmg`;
   return {
-    win65: { name: n65, primaryUrl: `${localBase}/${n65}`, ghUrl: `${ghBase}/${n65}`, sizeText: '1.62 MB' },
-    macos: { name: nMac, primaryUrl: `${macLocalBase}/${nMac}`, ghUrl: `${macGhBase}/${nMac}`, sizeText: '5.50 MB' },
+    win65: { name: winName, url: releaseAssetUrl(DEFAULT_RELEASE_TAG, winName), sizeText: '1.62 MB' },
+    macos: { name: macName, url: releaseAssetUrl(DEFAULT_RELEASE_TAG, macName), sizeText: '5.50 MB' },
   };
 }
 
@@ -37,118 +40,25 @@ function applyReleaseUI(tag: string, assets: ReleaseAssetMap): void {
   const heroVer = document.getElementById('hero-release-label');
   if (heroVer) heroVer.textContent = `最新版本 ${tag}`;
 
-  const isMac = /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent);
-  const heroBtn = document.getElementById('hero-primary-dl') as HTMLAnchorElement | null;
-  const heroLabel = document.getElementById('hero-primary-dl-label');
-  if (heroBtn && heroLabel) {
-    if (isMac) {
-      heroBtn.href = assets.macos.primaryUrl;
-      heroLabel.textContent = `免费下载 macOS 通用版（${assets.macos.sizeText}）`;
-    } else {
-      heroBtn.href = assets.win65.primaryUrl;
-      heroLabel.textContent = `免费下载 Windows 版（${assets.win65.sizeText}）`;
-    }
-  }
+  const heroTargets = {
+    win65: ['hero-win-dl', 'hero-win-dl-label', 'Windows'],
+    macos: ['hero-mac-dl', 'hero-mac-dl-label', 'macOS'],
+  } as const;
 
   (Object.keys(assets) as Array<keyof ReleaseAssetMap>).forEach((key) => {
     const item = assets[key];
+    const [heroId, labelId, platform] = heroTargets[key];
+    const heroBtn = document.getElementById(heroId) as HTMLAnchorElement | null;
+    const heroLabel = document.getElementById(labelId);
+    if (heroBtn) heroBtn.href = item.url;
+    if (heroLabel) heroLabel.textContent = `下载 ${platform} 版（${item.sizeText}）`;
+
     const nameEl = document.querySelector(`[data-asset-name="${key}"]`);
     const sizeEl = document.querySelector(`[data-asset-size="${key}"]`);
     const primaryEl = document.querySelector(`[data-dl-primary="${key}"]`) as HTMLAnchorElement | null;
-    const ghEl = document.querySelector(`[data-dl-gh="${key}"]`) as HTMLAnchorElement | null;
     if (nameEl) nameEl.textContent = item.name;
     if (sizeEl) sizeEl.textContent = item.sizeText;
-    if (primaryEl) primaryEl.href = item.primaryUrl;
-    if (ghEl) {
-      ghEl.href = item.ghUrl;
-      ghEl.dataset.filename = item.name;
-      ghEl.dataset.version = tag;
-    }
-  });
-}
-
-interface LiveStatsPayload {
-  total_downloads?: number;
-  qianyi_downloads?: number;
-  today_downloads?: number;
-  github_downloads?: number;
-  combined_downloads?: number;
-  updated_at_cst?: string;
-}
-
-function formatCount(n: number): string {
-  return Math.max(0, Math.floor(n)).toLocaleString('en-US');
-}
-
-function refreshLiveDownloadStats(): void {
-  void fetch('/kurocat/api/stats', { cache: 'no-cache' })
-    .then((r) => (r.ok ? (r.json() as Promise<LiveStatsPayload>) : null))
-    .then((data) => {
-      if (!data) return;
-      const qianyiDl =
-        typeof data.qianyi_downloads === 'number'
-          ? data.qianyi_downloads
-          : typeof data.total_downloads === 'number'
-            ? data.total_downloads
-            : 0;
-      const githubDl = typeof data.github_downloads === 'number' ? data.github_downloads : 0;
-      const combinedDl =
-        typeof data.combined_downloads === 'number' ? data.combined_downloads : qianyiDl + githubDl;
-      const todayDl = typeof data.today_downloads === 'number' ? data.today_downloads : 0;
-
-      if (combinedDl > 0) {
-        const sep = document.getElementById('site-dl-sep');
-        const txt = document.getElementById('site-dl-text');
-        if (sep && txt) {
-          sep.style.display = '';
-          txt.style.display = '';
-          txt.textContent = `累计下载 ${formatCount(combinedDl)} 次`;
-        }
-      }
-
-      const totalEl = document.getElementById('live-dl-total');
-      const ghEl = document.getElementById('live-dl-github');
-      const qyEl = document.getElementById('live-dl-qianyi');
-      const todayEl = document.getElementById('live-dl-today');
-      const updatedEl = document.getElementById('live-stats-updated');
-
-      if (totalEl) totalEl.textContent = `${formatCount(combinedDl)}`;
-      if (ghEl) ghEl.textContent = `${formatCount(githubDl)}`;
-      if (qyEl) qyEl.textContent = `${formatCount(qianyiDl)}`;
-      if (todayEl) todayEl.textContent = formatCount(todayDl);
-      if (updatedEl) {
-        const timePart =
-          typeof data.updated_at_cst === 'string' && data.updated_at_cst.length >= 19
-            ? data.updated_at_cst.slice(11, 19)
-            : new Date().toTimeString().slice(0, 8);
-        updatedEl.textContent = `更新于 ${timePart} (UTC+8) · 每 30 秒自动刷新`;
-      }
-    })
-    .catch(() => {});
-}
-
-function initDownloadTracking(): void {
-  document.querySelectorAll<HTMLAnchorElement>('[data-dl-gh]').forEach((link) => {
-    link.addEventListener('click', () => {
-      const filename = link.dataset.filename || '';
-      const version = link.dataset.version || LOCAL_MIRROR_VERSION;
-      if (!filename) return;
-      const body = JSON.stringify({ filename, version });
-      try {
-        if (navigator.sendBeacon) {
-          navigator.sendBeacon('/kurocat/api/track-outbound', new Blob([body], { type: 'application/json' }));
-        } else {
-          void fetch('/kurocat/api/track-outbound', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body,
-            keepalive: true,
-          });
-        }
-      } catch {
-        // Never block outbound navigation
-      }
-    });
+    if (primaryEl) primaryEl.href = item.url;
   });
 }
 
@@ -157,8 +67,8 @@ async function syncGithubMetadata(): Promise<void> {
   const timer = window.setTimeout(() => controller.abort(), 4500);
   try {
     const [repoRes, relRes] = await Promise.all([
-      fetch('https://api.github.com/repos/qianyiai/kurocat', { signal: controller.signal }),
-      fetch('https://api.github.com/repos/qianyiai/kurocat/releases/latest', { signal: controller.signal }),
+      fetch(`https://api.github.com/repos/${GITHUB_REPO}`, { signal: controller.signal }),
+      fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, { signal: controller.signal }),
     ]);
 
     if (repoRes.ok) {
@@ -180,25 +90,18 @@ async function syncGithubMetadata(): Promise<void> {
       const ghAssets: Array<{ name: string; browser_download_url: string; size: number }> = Array.isArray(rel.assets)
         ? rel.assets
         : [];
-      if (tag && tag !== LOCAL_MIRROR_VERSION && ghAssets.length >= 2) {
-        const defaults = buildDefaultAssets();
-        const find = (pred: (n: string) => boolean) => ghAssets.find((a) => pred(a.name));
-        const a65 = find((n) => n.endsWith('-x64-setup.exe') && !n.includes('108key'));
-        const aMac = find((n) => n.endsWith('-macos-universal.dmg'));
+      const winAsset = ghAssets.find((asset) => asset.name.endsWith('-x64-setup.exe') && !asset.name.includes('108key'));
+      const macAsset = ghAssets.find((asset) => asset.name.endsWith('-macos-universal.dmg'));
 
-        const updated: ReleaseAssetMap = {
-          win65: a65
-            ? { name: a65.name, primaryUrl: a65.browser_download_url, ghUrl: a65.browser_download_url, sizeText: formatBytesMB(a65.size) }
-            : defaults.win65,
-          macos: aMac
-            ? { name: aMac.name, primaryUrl: aMac.browser_download_url, ghUrl: aMac.browser_download_url, sizeText: formatBytesMB(aMac.size) }
-            : defaults.macos,
-        };
-        applyReleaseUI(tag, updated);
+      if (tag && winAsset && macAsset) {
+        applyReleaseUI(tag, {
+          win65: { name: winAsset.name, url: winAsset.browser_download_url, sizeText: formatBytesMB(winAsset.size) },
+          macos: { name: macAsset.name, url: macAsset.browser_download_url, sizeText: formatBytesMB(macAsset.size) },
+        });
       }
     }
   } catch {
-    // Gracefully stay on fast local mirror defaults if GitHub API is unreachable
+    // GitHub 不可用时保留默认 Release 直链。
   } finally {
     window.clearTimeout(timer);
   }
@@ -313,26 +216,6 @@ function initPlayground(): void {
       document.getElementById('playground')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       startAutoDemo();
     });
-  }
-
-  // Whale demo vertical video sound toggle
-  const whaleVideo = document.getElementById('whale-demo-video') as HTMLVideoElement | null;
-  const whaleSoundBtn = document.getElementById('whale-sound-toggle');
-  if (whaleVideo && whaleSoundBtn) {
-    const syncSoundBtn = () => {
-      const muted = whaleVideo.muted;
-      whaleSoundBtn.classList.toggle('active', !muted);
-      whaleSoundBtn.textContent = muted ? '🔇 点此开启音效' : '🔊 音效已开启';
-    };
-    whaleSoundBtn.addEventListener('click', () => {
-      whaleVideo.muted = !whaleVideo.muted;
-      if (!whaleVideo.muted && whaleVideo.paused) {
-        void whaleVideo.play().catch(() => {});
-      }
-      syncSoundBtn();
-    });
-    whaleVideo.addEventListener('volumechange', syncSoundBtn);
-    syncSoundBtn();
   }
 
   // Backdrop switcher (Dark / Light desktop wallpaper preview)
@@ -676,8 +559,7 @@ function initPolish(): void {
   }
 }
 
-applyReleaseUI(LOCAL_MIRROR_VERSION, buildDefaultAssets());
-initDownloadTracking();
+applyReleaseUI(DEFAULT_RELEASE_TAG, buildDefaultAssets());
 initPlayground();
 initMcpCodeTabs();
 initPolish();

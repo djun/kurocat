@@ -425,7 +425,7 @@ async function bootstrap(): Promise<void> {
 
   btnToastOpenEl.addEventListener('click', (e) => {
     e.stopPropagation();
-    const url = latestUpdateInfo?.releaseUrl || 'https://github.com/qianyiai/kurocat/releases/latest';
+    const url = latestUpdateInfo?.releaseUrl || 'https://github.com/xpfyg/kurocat/releases/latest';
     void invoke('open_release_page', { url });
   });
 
@@ -517,6 +517,10 @@ async function bootstrap(): Promise<void> {
 
   await listen<boolean>('kuro-privacy', (ev) => {
     engine.setPrivacyMode(Boolean(ev.payload));
+  });
+
+  await listen<boolean>('kuro-media', (ev) => {
+    engine.setMusicPlaying(Boolean(ev.payload));
   });
 
   await listen<WindowCursorInfo>('kuro-cursor', (ev) => {

@@ -53,25 +53,36 @@ jobs:
       - name: Rename Windows installer asset
         shell: pwsh
         run: |
-          $tag = if ($env:GITHUB_REF_NAME -match '^v') { $env:GITHUB_REF_NAME } else { 'latest' }
+          $tag = '${{ inputs.release_tag }}'
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            if ($env:GITHUB_REF_NAME -match '^v') {
+              $tag = $env:GITHUB_REF_NAME
+            } else {
+              $version = node -p "require('./package.json').version"
+              $tag = "v$version"
+            }
+          }
           $ver = $tag.TrimStart('v')
           $nsis = Get-ChildItem "src-tauri/target/release/bundle/nsis/*-setup.exe" | Select-Object -First 1
-          if ($nsis) {
-            Copy-Item $nsis.FullName "KuroCat-$ver-x64-setup.exe"
+          if ($null -eq $nsis) {
+            throw 'Windows NSIS installer was not generated'
           }
+          Copy-Item $nsis.FullName "KuroCat-$ver-x64-setup.exe"
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: kurocat-windows-x64
+          if-no-files-found: error
           path: |
             KuroCat-*-x64-setup.exe
 
       - name: Publish Windows assets to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
         uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          draft: false
           files: |
             KuroCat-*-x64-setup.exe
 
@@ -119,6 +130,8 @@ jobs:
           echo "=== Verify macOS minimum version & Universal slices ==="
           plutil -p "$APP_PATH/Contents/Info.plist" | grep -i MinimumSystemVersion || true
           lipo -info "$APP_PATH/Contents/MacOS/KuroCat"
+          lipo -info "$APP_PATH/Contents/MacOS/KuroCat" | grep -q 'x86_64'
+          lipo -info "$APP_PATH/Contents/MacOS/KuroCat" | grep -q 'arm64'
           otool -arch x86_64 -l "$APP_PATH/Contents/MacOS/KuroCat" | grep -A4 -E "LC_BUILD_VERSION|LC_VERSION_MIN_MACOSX" || true
           otool -arch arm64 -l "$APP_PATH/Contents/MacOS/KuroCat" | grep -A4 -E "LC_BUILD_VERSION|LC_VERSION_MIN_MACOSX" || true
           mkdir -p dmg_staging
@@ -126,21 +139,25 @@ jobs:
           ln -s /Applications dmg_staging/Applications
           hdiutil create -volname "KuroCat" -srcfolder dmg_staging -ov -format UDZO "KuroCat-${TAG}-macos-universal.dmg"
           tar -czf "KuroCat-${TAG}-macos-universal.app.tar.gz" -C "src-tauri/target/universal-apple-darwin/release/bundle/macos" "KuroCat.app"
+          test -s "KuroCat-${TAG}-macos-universal.dmg"
+          test -s "KuroCat-${TAG}-macos-universal.app.tar.gz"
           ls -lh "KuroCat-${TAG}-macos-universal.dmg" "KuroCat-${TAG}-macos-universal.app.tar.gz"
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
           name: kurocat-macos-universal
+          if-no-files-found: error
           path: |
             KuroCat-*-macos-universal.dmg
             KuroCat-*-macos-universal.app.tar.gz
 
       - name: Publish macOS assets to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
         uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          draft: false
           files: |
             KuroCat-*-macos-universal.dmg
             KuroCat-*-macos-universal.app.tar.gz
@@ -251,10 +268,11 @@ jobs:
             KuroCat-*-linux-${{ matrix.arch }}.AppImage
 
       - name: Publish Linux assets to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
         uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          draft: false
           files: |
             KuroCat-*-linux-${{ matrix.arch }}.deb
             KuroCat-*-linux-${{ matrix.arch }}.AppImage

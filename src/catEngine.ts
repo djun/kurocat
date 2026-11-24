@@ -66,6 +66,39 @@ interface KeyAnim {
   lastHitAt: number;
 }
 
+export type CatMood = 'neutral' | 'relaxed' | 'annoyed';
+
+interface MusicNoteParticle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  age: number;
+  life: number;
+  rot: number;
+  rotVel: number;
+  size: number;
+  glyph: string;
+  color: string;
+}
+
+interface TypingSpark {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  age: number;
+  life: number;
+  size: number;
+  color: string;
+}
+
+// Continuous-typing mood tuning: short thinking pauses keep the streak alive,
+// but a real break resets it.
+const WORK_ANNOY_SECONDS = 16;
+const WORK_TYPING_GAP_MS = 1200;
+const WORK_STREAK_BREAK_MS = 4200;
+
 // Exact measured pixel silhouette half-width profile from original video 0.3s (compact chubby sitting cat!)
 // t = 0.0 (ear tips) -> t = 1.0 (bottom base flush on keyboard)
 const BODY_SLICES: Array<{ t: number; hw: number }> = [
@@ -103,6 +136,20 @@ export class KuroCatEngine {
   private privacyTypingAt = -10000;
   private lastMouseNX = 0.5;
   private lastDt = 1 / 60;
+
+  // Mood system: music relaxes the cat, endless typing makes it grumpy.
+  public mood: CatMood = 'neutral';
+  private musicPlaying = false;
+  private workTypingSec = 0;
+  private relaxAmount = 0;
+  private annoyAmount = 0;
+  private musicNotes: MusicNoteParticle[] = [];
+  private typingSparks: TypingSpark[] = [];
+  private nextMusicNoteAt = 0;
+
+  public setMusicPlaying(active: boolean): void {
+    this.musicPlaying = active;
+  }
 
   public setPrivacyMode(active: boolean): void {
     this.privacyMode = active;
@@ -398,13 +445,19 @@ export class KuroCatEngine {
     const shearCurve = u * u * (3 - 2 * u); // smoothstep from hips up to head!
     // Measured mouse-lean shift (-46px at head) + lively typing left-right body/head sway (+-25px)!
     const leanAmp = this.keyboardLayout === '108' ? 76 : 46;
-    const leanX = (this.spineLean * leanAmp + this.typingSway * 25 + this.strikeRock * 10) * shearCurve;
+    const leanX =
+      (this.spineLean * leanAmp + this.typingSway * 25 + this.strikeRock * 10) * shearCurve;
+    // Gentle music sway when relaxed, tiny frustrated tremble when typing too long.
+    const moodSwayX =
+      (this.relaxAmount * Math.sin(this.elapsed * 2.2) * 4.5 +
+        this.annoyAmount * Math.sin(this.elapsed * 15) * 1.3) *
+      shearCurve;
     const swayDipY = Math.abs(this.typingSway) * 4.0 * shearCurve;
     const hunchY = (this.typingHunch * 13 + this.bodyBob * 4.8 + breath) * shearCurve + swayDipY;
     // Slight forward drop when leaning deeply to the mouse
     const leanDropY = Math.abs(this.spineLean) * 6 * shearCurve;
     return {
-      x: this.catCenterX + leanX,
+      x: this.catCenterX + leanX + moodSwayX,
       y: this.catTopY + t * this.catHeight + hunchY + leanDropY,
     };
   }
@@ -452,8 +505,8 @@ export class KuroCatEngine {
     this.recentKeyTimes.push(now);
     if (this.recentKeyTimes.length > 26) this.recentKeyTimes.shift();
 
-    this.bodyBob = Math.min(1.15, this.bodyBob + 0.65);
-    this.kbBounce = Math.min(1, this.kbBounce + 0.45);
+    this.bodyBob = Math.min(1.15, this.bodyBob + 0.65 * (1 + this.annoyAmount * 0.4));
+    this.kbBounce = Math.min(1, this.kbBounce + 0.45 * (1 + this.annoyAmount * 0.55));
 
     if (this.catBreed === 'dafeiyu') {
       const pt = this.getKeyWorldCenter(spec);
@@ -517,7 +570,8 @@ export class KuroCatEngine {
     }
 
     const sideSign = chosen.side === 'left' ? -1 : 1;
-    this.strikeRockVel += sideSign * (1.75 + this.typingEnergy * 1.25);
+    this.strikeRockVel +=
+      sideSign * (1.75 + this.typingEnergy * 1.25) * (1 + this.annoyAmount * 0.5);
     if (!activelyMousing) {
       // Lively groove impulse: rocks head & upper body back and forth as the cat types!
       this.typingSwayVel += (keyBias * 2.1 + Math.cos(this.typingGroovePhase) * 1.65) * (0.9 + this.typingEnergy * 0.45);
@@ -557,6 +611,10 @@ export class KuroCatEngine {
       if (label) {
         this.spawnBubble(label, spec.id === 'space', targetPoint.x, now);
       }
+    }
+    // Frustrated fast typing throws tiny sparks off the struck keycap.
+    if (this.annoyAmount > 0.35) {
+      this.spawnTypingSparks(targetPoint.x, targetPoint.y);
     }
   }
 
@@ -778,7 +836,7 @@ export class KuroCatEngine {
       targetY: staggerY,
       rot: ((Math.random() - 0.5) * 4.5 * Math.PI) / 180,
       createdAt: now,
-      lifetime: 940,
+      lifetime: 940 * (1 - this.annoyAmount * 0.26),
     });
     this.layoutBubbles();
   }
@@ -800,6 +858,192 @@ export class KuroCatEngine {
       this.bubbles[i].targetX = cursor + w * 0.5;
       cursor += w + gap;
     }
+  }
+
+  // ---- Mood particles & overlays (music notes / anger mark / typing sparks) ----
+
+  private spawnMusicNote(): void {
+    const head = this.spinePoint(0.10, 0);
+    const glyphs = ['♪', '♫', '♬'];
+    const colors = ['#ff9fc6', '#bfa4ff', '#ffc0d9'];
+    this.musicNotes.push({
+      x: head.x + (Math.random() - 0.5) * 62,
+      y: head.y - 4 - Math.random() * 12,
+      vx: (Math.random() - 0.5) * 10,
+      vy: -16 - Math.random() * 10,
+      age: 0,
+      life: 2.1 + Math.random() * 1.0,
+      rot: (Math.random() - 0.5) * 0.5,
+      rotVel: (Math.random() - 0.5) * 1.4,
+      size: 14 + Math.random() * 6,
+      glyph: glyphs[Math.floor(Math.random() * glyphs.length)],
+      color: colors[Math.floor(Math.random() * colors.length)],
+    });
+    if (this.musicNotes.length > 12) this.musicNotes.shift();
+  }
+
+  private spawnTypingSparks(x: number, y: number): void {
+    const count = 1 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < count; i++) {
+      const ang = -Math.PI / 2 + (Math.random() - 0.5) * 2.4;
+      const speed = 55 + Math.random() * 80;
+      this.typingSparks.push({
+        x,
+        y,
+        vx: Math.cos(ang) * speed,
+        vy: Math.sin(ang) * speed,
+        age: 0,
+        life: 0.24 + Math.random() * 0.18,
+        size: 0.75 + Math.random() * 0.5,
+        color: Math.random() < 0.5 ? '#ffb36b' : '#ff7d6a',
+      });
+    }
+    if (this.typingSparks.length > 28) {
+      this.typingSparks.splice(0, this.typingSparks.length - 28);
+    }
+  }
+
+  private updateMoodParticles(dt: number): void {
+    for (const n of this.musicNotes) {
+      n.age += dt;
+      n.x += (n.vx + Math.sin(n.age * 2.6) * 9) * dt;
+      n.y += n.vy * dt;
+      n.rot += n.rotVel * dt;
+    }
+    this.musicNotes = this.musicNotes.filter((n) => n.age < n.life);
+
+    for (const s of this.typingSparks) {
+      s.age += dt;
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      s.vy += 160 * dt;
+    }
+    this.typingSparks = this.typingSparks.filter((s) => s.age < s.life);
+  }
+
+  private drawMusicNotes(ctx: CanvasRenderingContext2D): void {
+    for (const n of this.musicNotes) {
+      const t = n.age / n.life;
+      const alpha = t < 0.15 ? t / 0.15 : Math.max(0, 1 - (t - 0.5) / 0.5);
+      if (alpha <= 0.01) continue;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(n.x, n.y);
+      ctx.rotate(n.rot);
+      ctx.font = `700 ${n.size.toFixed(1)}px "Apple Symbols", "Segoe UI Symbol", system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = n.color;
+      ctx.shadowColor = 'rgba(255, 255, 255, 0.85)';
+      ctx.shadowBlur = 6;
+      ctx.fillText(n.glyph, 0, 0);
+      ctx.restore();
+    }
+  }
+
+  private drawTypingSparks(ctx: CanvasRenderingContext2D): void {
+    for (const s of this.typingSparks) {
+      const alpha = Math.max(0, 1 - s.age / s.life);
+      if (alpha <= 0.02) continue;
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.9;
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = 1.6 * s.size;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(s.x - s.vx * 0.016, s.y - s.vy * 0.016);
+      ctx.lineTo(s.x, s.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  private drawAngerMark(ctx: CanvasRenderingContext2D, breath: number): void {
+    const a = this.annoyAmount;
+    if (a < 0.12) return;
+    const head = this.spinePoint(0.18, breath);
+    const pulse = 0.92 + Math.sin(this.elapsed * 9) * 0.1;
+    const s = (0.72 + a * 0.55) * pulse;
+    const x = head.x + 48 + Math.sin(this.elapsed * 2.8) * 1.4;
+    const y = head.y - 26;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, a * 1.15);
+    ctx.strokeStyle = '#ff5f4d';
+    ctx.lineWidth = 2.6 * s;
+    ctx.lineCap = 'round';
+    ctx.shadowColor = 'rgba(255, 74, 58, 0.6)';
+    ctx.shadowBlur = 5;
+    for (const [dx, dy] of [
+      [1, 1],
+      [1, -1],
+      [-1, 1],
+      [-1, -1],
+    ]) {
+      ctx.beginPath();
+      ctx.moveTo(x + dx * 3.4 * s, y + dy * 3.4 * s);
+      ctx.quadraticCurveTo(
+        x + (dx * 7.4 + dy * 1.3) * s,
+        y + (dy * 7.4 - dx * 1.3) * s,
+        x + dx * 10.6 * s,
+        y + dy * 10.6 * s,
+      );
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  private drawMoodEffects(ctx: CanvasRenderingContext2D, breath: number): void {
+    if (this.privacyMode) return;
+    this.drawTypingSparks(ctx);
+    this.drawMusicNotes(ctx);
+    this.drawAngerMark(ctx, breath);
+  }
+
+  private drawMoodBlush(ctx: CanvasRenderingContext2D, cx: number, color: string): void {
+    const a = Math.max(0, this.relaxAmount * (1 - this.annoyAmount));
+    if (a < 0.03) return;
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 7;
+    ctx.globalAlpha = Math.min(1, a) * 0.48;
+    ctx.beginPath();
+    ctx.ellipse(cx - 30, 13.5, 11, 5.8, -0.08, 0, Math.PI * 2);
+    ctx.ellipse(cx + 30, 13.5, 11, 5.8, 0.08, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = Math.min(1, a) * 0.32;
+    ctx.beginPath();
+    ctx.ellipse(cx - 30, 13.5, 7, 3.6, -0.08, 0, Math.PI * 2);
+    ctx.ellipse(cx + 30, 13.5, 7, 3.6, 0.08, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  private drawAngryBrows(ctx: CanvasRenderingContext2D, cx: number, ink: string): void {
+    const a = this.annoyAmount;
+    if (a < 0.12) return;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, a * 1.1);
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = 3.0;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx - 35, -25.5);
+    ctx.lineTo(cx - 11, -18.5);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + 35, -25.5);
+    ctx.lineTo(cx + 11, -18.5);
+    ctx.stroke();
+    ctx.globalAlpha *= 0.6;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(cx - 3.5, -27.5);
+    ctx.lineTo(cx - 2.5, -22.5);
+    ctx.moveTo(cx + 3.5, -27.5);
+    ctx.lineTo(cx + 2.5, -22.5);
+    ctx.stroke();
+    ctx.restore();
   }
 
   // ---- Simulation update ----
@@ -828,6 +1072,29 @@ export class KuroCatEngine {
     const targetTypingEnergy = Math.min(1, this.recentKeyTimes.length / 7);
     this.typingEnergy += (targetTypingEnergy - this.typingEnergy) * (1 - Math.exp(-9 * dt));
 
+    // Mood: accumulate real typing time; short pauses do not break the streak, a real
+    // break (>~4s) does. Music keeps the cat relaxed unless it has been typing too long.
+    const sinceKey = now - this.lastAnyKeyAt;
+    if (sinceKey > WORK_STREAK_BREAK_MS) {
+      this.workTypingSec = 0;
+    } else if (sinceKey < WORK_TYPING_GAP_MS) {
+      this.workTypingSec = Math.min(WORK_ANNOY_SECONDS + 60, this.workTypingSec + dt);
+    }
+    const moodBlocked = this.privacyMode;
+    const wantAnnoy =
+      !moodBlocked && this.workTypingSec >= WORK_ANNOY_SECONDS ? 1 : 0;
+    const wantRelax = !moodBlocked && wantAnnoy === 0 && this.musicPlaying ? 1 : 0;
+    this.relaxAmount += (wantRelax - this.relaxAmount) * (1 - Math.exp(-1.6 * dt));
+    this.annoyAmount += (wantAnnoy - this.annoyAmount) * (1 - Math.exp(-2.4 * dt));
+    this.mood =
+      this.annoyAmount > 0.5 ? 'annoyed' : this.relaxAmount > 0.5 ? 'relaxed' : 'neutral';
+
+    if (this.relaxAmount > 0.45 && !this.privacyMode && now >= this.nextMusicNoteAt) {
+      this.spawnMusicNote();
+      this.nextMusicNoteAt = now + 420 + Math.random() * 420;
+    }
+    this.updateMoodParticles(dt);
+
     const isTypingRecently = now - this.lastAnyKeyAt < 650;
     const targetHunch = isTypingRecently ? 0.45 + this.typingEnergy * 0.55 : 0;
     this.typingHunch += (targetHunch - this.typingHunch) * (1 - Math.exp(-10 * dt));
@@ -842,9 +1109,10 @@ export class KuroCatEngine {
     // Playful left-right body & head groove sway during pure typing (matches original video first half!)
     const pureTypingActive = isTypingRecently && this.leftPaw.mode !== 'mouse';
     if (pureTypingActive) {
-      this.typingGroovePhase += dt * (4.8 + this.typingEnergy * 5.2);
+      this.typingGroovePhase += dt * (4.8 + this.typingEnergy * 5.2 + this.annoyAmount * 4.2);
     }
-    const grooveWave = Math.sin(this.typingGroovePhase) * (0.58 + this.typingEnergy * 0.44);
+    const grooveWave =
+      Math.sin(this.typingGroovePhase) * (0.58 + this.typingEnergy * 0.44 + this.annoyAmount * 0.16);
     const targetTypingSway = pureTypingActive
       ? Math.max(-1.1, Math.min(1.1, grooveWave * 0.72 + this.lastKeyBias * 0.55))
       : this.leftPaw.mode === 'mouse' && isTypingRecently
@@ -867,7 +1135,9 @@ export class KuroCatEngine {
     const desiredHeadTilt =
       this.typingSway * 0.18 +
       this.typingHunch * (this.strikeRock * 0.065 - 0.02) +
-      this.spineLean * 0.085;
+      this.spineLean * 0.085 +
+      this.relaxAmount * Math.sin(this.elapsed * 2.0) * 0.06 +
+      this.annoyAmount * Math.sin(this.elapsed * 13) * 0.014;
     this.headTilt += (desiredHeadTilt - this.headTilt) * (1 - Math.exp(-12 * dt));
 
     this.petEnergy = Math.max(0, this.petEnergy - dt * (this.cursorOverCat ? 0.22 : 1.15));
@@ -1004,7 +1274,9 @@ export class KuroCatEngine {
     paw.curlWeight += (wantCurl - paw.curlWeight) * blendRate;
 
     // Unconditionally stable, framerate-independent tracking (ZERO Euler spring overshoot at any FPS!)
-    const followRate = paw.mode === 'poke' ? 42 : paw.mode === 'mouse' ? 32 : 22;
+    const followRate =
+      (paw.mode === 'poke' ? 42 : paw.mode === 'mouse' ? 32 : 22) *
+      (1 + this.annoyAmount * 0.6);
     const follow = 1 - Math.exp(-followRate * dt);
     paw.pos.x += (paw.target.x - paw.pos.x) * follow;
     paw.pos.y += (paw.target.y - paw.pos.y) * follow;
@@ -1091,6 +1363,9 @@ export class KuroCatEngine {
     // Layer 4: True-scale velvety cat paws (tapered idle legs / planted diagonal mouse support leg / bent curled chest paw / plump round poking paw!)
     this.drawPaw(ctx, this.leftPaw, breath);
     this.drawPaw(ctx, this.rightPaw, breath);
+
+    // Layer 4.5: Mood overlays (floating music notes / anger mark / frustrated typing sparks)
+    this.drawMoodEffects(ctx, breath);
 
     // Layer 5: Organic bouncing 3D keycap bubbles & crisp mouse click badges
     if (this.showKeyBubbles && !this.privacyMode) {
@@ -1489,8 +1764,8 @@ export class KuroCatEngine {
 
     const drawOneEar = (sideSign: -1 | 1, twitch: number) => {
       ctx.save();
-      ctx.translate(sideSign * 33 + this.faceTurnX * 0.18, -28);
-      ctx.rotate(sideSign * (0.08 + twitch));
+      ctx.translate(sideSign * 33 + this.faceTurnX * 0.18, -28 + this.annoyAmount * 4.5);
+      ctx.rotate(sideSign * (0.08 + twitch + this.annoyAmount * 0.26));
 
       const earPath = () => {
         ctx.beginPath();
@@ -1559,6 +1834,9 @@ export class KuroCatEngine {
 
     const wShift = this.faceTurnX * 0.72;
 
+    // Mood: rosy cheeks when relaxed by music, furrowed brows when stuck typing too long.
+    this.drawMoodBlush(ctx, wShift, isRagdoll ? '#f492a6' : '#ff8fa3');
+
     // 4) Ragdoll rosy petting blush + adorable tiny pink nose & gentle kitten smile!
     if (isRagdoll) {
       if (this.squintAmount > 0.12) {
@@ -1612,6 +1890,7 @@ export class KuroCatEngine {
 
     // 6) Expressive eyes (lemon-chartreuse for Black Cat / luminous sapphire-blue for Ragdoll!)
     this.drawEyes(ctx, wShift, -1);
+    this.drawAngryBrows(ctx, wShift, isRagdoll ? 'rgba(56, 46, 40, 0.92)' : 'rgba(255, 226, 214, 0.92)');
 
     ctx.restore(); // end head
 
@@ -1676,7 +1955,10 @@ export class KuroCatEngine {
         continue;
       }
 
-      const openRy = Math.max(1.2, ry * (1 - closedness));
+      const openRy =
+        Math.max(1.2, ry * (1 - closedness)) *
+        (1 - this.relaxAmount * 0.16) *
+        (1 - this.annoyAmount * 0.3);
       const curiousTilt = (idx === 0 ? -0.1 : 0.1) * (0.25 + this.typingHunch * 0.75);
       ctx.rotate(curiousTilt);
 
@@ -2853,8 +3135,8 @@ export class KuroCatEngine {
 
     const drawCustomEar = (sideSign: -1 | 1, twitch: number) => {
       ctx.save();
-      ctx.translate(sideSign * 33 + this.faceTurnX * 0.18, -28);
-      ctx.rotate(sideSign * (0.08 + twitch));
+      ctx.translate(sideSign * 33 + this.faceTurnX * 0.18, -28 + this.annoyAmount * 4.5);
+      ctx.rotate(sideSign * (0.08 + twitch + this.annoyAmount * 0.26));
 
       const earPath = () => {
         ctx.beginPath();
@@ -2920,6 +3202,9 @@ export class KuroCatEngine {
     ctx.shadowOffsetY = 0;
     const wShift = this.faceTurnX * 0.72;
 
+    // Mood: rosy cheeks when relaxed by music, furrowed brows when stuck typing too long.
+    this.drawMoodBlush(ctx, wShift, s.blushColor || '#ff8fa3');
+
     // Blush on petting
     if (s.blushColor && this.squintAmount > 0.12) {
       ctx.save();
@@ -2974,6 +3259,11 @@ export class KuroCatEngine {
     }
 
     this.drawCustomEyes(ctx, s, wShift, -1);
+    this.drawAngryBrows(
+      ctx,
+      wShift,
+      s.outlineColor || (s.isDarkBase ? 'rgba(255, 226, 214, 0.92)' : 'rgba(56, 46, 40, 0.92)'),
+    );
 
     ctx.restore();
     ctx.restore();
@@ -3023,7 +3313,10 @@ export class KuroCatEngine {
         continue;
       }
 
-      const openRy = Math.max(1.2, ry * (1 - closedness));
+      const openRy =
+        Math.max(1.2, ry * (1 - closedness)) *
+        (1 - this.relaxAmount * 0.16) *
+        (1 - this.annoyAmount * 0.3);
       const curiousTilt = (idx === 0 ? -0.1 : 0.1) * (0.25 + this.typingHunch * 0.75);
       ctx.rotate(curiousTilt);
 

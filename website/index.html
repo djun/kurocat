@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>KuroCat · 桌面打字小黑猫伴侣 — 谦一 (Qianyi)</title>
-  <meta name="description" content="KuroCat 是一款轻量级 Windows & macOS 透明置顶桌面打字猫咪伴侣：6 款手绘猫咪 + 🐳 大肥鱼（鲸鱼娘）皮肤、输密码自动闭眼/捂眼防偷窥、65% / 108 键全尺寸可选、鼠标左右键独立识别、20%–150% 丝滑缩放、原生内置 MCP 协议支持 AI 一句话捏自己的猫。" />
-  <meta property="og:title" content="KuroCat · 桌面打字小黑猫伴侣" />
-  <meta property="og:description" content="免费开源的 Windows & macOS 桌面键鼠猫咪伴侣，支持网页端在线互动试玩、6 款猫咪 + 鲸鱼娘大肥鱼皮肤、输密码自动闭眼防偷窥、108 键小键盘与 AI MCP 定制。" />
+  <title>KuroCat · xpfyg 的开源桌面猫咪伴侣</title>
+  <meta name="description" content="KuroCat 是 xpfyg 维护的开源 Windows 与 macOS 桌面键鼠猫咪伴侣，支持多款皮肤、密码防偷窥、双键盘布局与 AI MCP 定制。提供 GitHub Release 官方下载。" />
+  <meta property="og:title" content="KuroCat · xpfyg 的开源桌面猫咪伴侣" />
+  <meta property="og:description" content="一只会敲键盘的小黑猫，住进你的 Windows 或 macOS 桌面。在线试玩并从 GitHub Release 免费下载。" />
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://qianyi.one/kurocat/" />
-  <meta property="og:image" content="https://qianyi.one/kurocat/assets/kurocat-icon.png" />
-  <link rel="icon" href="/kurocat/assets/favicon.ico" sizes="any" />
-  <link rel="icon" type="image/png" href="/kurocat/assets/kurocat-icon.png" />
-  <link rel="apple-touch-icon" href="/kurocat/assets/apple-touch-icon.png" />
+  <meta property="og:url" content="https://37lj1lcl30ek76wo2d9.traesite.cn/" />
+  <meta property="og:image" content="https://37lj1lcl30ek76wo2d9.traesite.cn/assets/showcase-108key.webp" />
+  <link rel="icon" href="./assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" href="./assets/kurocat-icon.png" />
+  <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png" />
   <link rel="stylesheet" href="./src/styles.css" />
 </head>
 <body>
@@ -22,21 +22,20 @@
   <header class="global-nav">
     <div class="nav-inner">
       <div class="nav-brand-group">
-        <a class="brand-back" href="/" aria-label="返回谦一主页">← 谦一</a>
+        <a class="brand-back" href="https://github.com/xpfyg" target="_blank" rel="noopener" aria-label="访问 xpfyg 的 GitHub 主页">xpfyg</a>
         <span class="brand-sep">/</span>
         <a class="brand-current" href="#top">
-          <img class="nav-icon" src="/kurocat/assets/kurocat-icon.png" alt="KuroCat" width="20" height="20" />
+          <img class="nav-icon" src="./assets/kurocat-icon.png" alt="KuroCat" width="20" height="20" />
           <span>KuroCat</span>
           <span class="ver-pill" id="nav-ver-pill">v4.7.0</span>
         </a>
       </div>
       <nav class="nav-links" aria-label="主导航">
         <a href="#playground">在线试玩</a>
-        <a href="#whale-demo">鲸鱼娘视频</a>
         <a href="#download">立即下载</a>
         <a href="#features">核心特性</a>
         <a href="#mcp">AI 捏猫</a>
-        <a href="https://github.com/qianyiai/kurocat" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/xpfyg/kurocat" target="_blank" rel="noopener">GitHub</a>
       </nav>
     </div>
   </header>
@@ -46,9 +45,9 @@
     <section class="hero-stage reveal visible" id="playground">
       <div class="hero-copy">
         <div class="hero-badge-row">
-          <img class="hero-app-icon" src="/kurocat/assets/kurocat-icon.png" alt="KuroCat 图标" width="56" height="56" />
+          <img class="hero-app-icon" src="./assets/kurocat-icon.png" alt="KuroCat 图标" width="56" height="56" />
           <div>
-            <div class="eyebrow" style="margin-bottom:4px;">Windows &amp; macOS · Open Source</div>
+            <div class="eyebrow" style="margin-bottom:4px;">xpfyg · Independent Developer</div>
             <div class="hero-meta-line">
               <span class="live-dot"></span>
               <span id="hero-release-label">最新版本 v4.7.0</span>
@@ -64,19 +63,19 @@
         </h1>
 
         <p class="hero-sub">
-          基于 <strong>Tauri v2 + Rust 原生钩子 + Canvas 2D</strong> 打造的透明置顶桌面键鼠伴侣。
-          零外部依赖、约 24 MB 轻量常驻；内置 <strong>6 款手绘猫咪 + 🐳 大肥鱼（鲸鱼娘）</strong>、<strong>输密码自动闭眼/捂眼防偷窥</strong>、<strong>65% / 108 键全尺寸键盘</strong> 与 <strong>原生 MCP 协议</strong>，发张照片就能让 AI 一句话捏出你家的猫。
+          <strong>xpfyg 维护的开源桌面项目</strong>，基于 Tauri v2、Rust 原生钩子与 Canvas 2D 打造。
+          透明置顶、轻量常驻；内置 <strong>6 款手绘猫咪 + 🐳 大肥鱼（鲸鱼娘）</strong>、<strong>输密码自动闭眼/捂眼防偷窥</strong>、<strong>65% / 108 键全尺寸键盘</strong> 与 <strong>原生 MCP 协议</strong>，让 AI 一句话捏出你家的猫。
         </p>
 
-        <div class="hero-actions">
-          <a class="btn-lime" id="hero-primary-dl" href="/kurocat/releases/v4.7.0/KuroCat-4.7.0-x64-setup.exe" download>
+        <div class="hero-actions hero-downloads">
+          <a class="btn-lime" id="hero-win-dl" href="https://github.com/xpfyg/kurocat/releases/download/v4.7.0/KuroCat-4.7.0-x64-setup.exe" target="_blank" rel="noopener">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2.2v7.6m0 0L4.8 6.6M8 9.8l3.2-3.2M2.5 12.8h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span id="hero-primary-dl-label">免费下载 Windows 版（1.62 MB）</span>
+            <span id="hero-win-dl-label">下载 Windows 版</span>
           </a>
-          <a class="btn-outline" href="#download">全部平台与版本</a>
-          <a class="btn-ghost" href="https://github.com/qianyiai/kurocat" target="_blank" rel="noopener">
-            GitHub 源码 ›
+          <a class="btn-outline hero-mac-btn" id="hero-mac-dl" href="https://github.com/xpfyg/kurocat/releases/download/v4.7.0/KuroCat-v4.7.0-macos-universal.dmg" target="_blank" rel="noopener">
+            <span id="hero-mac-dl-label">下载 macOS 版</span>
           </a>
+          <a class="btn-ghost" href="https://github.com/xpfyg/kurocat" target="_blank" rel="noopener">GitHub 源码 ›</a>
         </div>
 
         <div class="hero-specs">
@@ -166,11 +165,11 @@
     <!-- Download Section -->
     <section class="section-block reveal" id="download">
       <div class="section-header">
-        <div class="eyebrow">Direct Downloads · Cloudflare Edge CDN</div>
-        <h2 class="section-title">免费下载，3 秒住进你的桌面</h2>
+        <div class="eyebrow">GitHub Releases · Windows &amp; macOS</div>
+        <h2 class="section-title">选择你的平台，立刻开始</h2>
         <p class="section-sub">
-          所有安装包均内置 <strong>20%–150% 无级缩放</strong>、<strong>65% / 108 键随时切换</strong> 与 <strong>App 内自动更新</strong>。<br />
-          默认提供 <code>qianyi.one</code> 国内高速直链，同时保留 GitHub Releases 官方原链与 SHA-256 校验。
+          安装包由 GitHub Actions 编译并发布，下载按钮直接前往当前仓库的官方 Release 附件。<br />
+          两个版本均支持 <strong>20%–150% 无级缩放</strong>、<strong>65% / 108 键切换</strong> 与 <strong>App 内自动更新</strong>。
         </p>
       </div>
 
@@ -195,11 +194,8 @@
             <span class="dl-size" data-asset-size="win65">1.62 MB</span>
           </div>
           <div class="dl-actions">
-            <a class="btn-lime btn-full" data-dl-primary="win65" href="/kurocat/releases/v4.7.0/KuroCat-4.7.0-x64-setup.exe" download>
-              高速直链下载
-            </a>
-            <a class="dl-alt-link" data-dl-gh="win65" href="https://github.com/qianyiai/kurocat/releases/download/v4.7.0/KuroCat-4.7.0-x64-setup.exe" target="_blank" rel="noopener">
-              GitHub 官方源 ›
+            <a class="btn-lime btn-full" data-dl-primary="win65" href="https://github.com/xpfyg/kurocat/releases/download/v4.7.0/KuroCat-4.7.0-x64-setup.exe" target="_blank" rel="noopener">
+              从 GitHub 下载 Windows 版 ›
             </a>
           </div>
         </article>
@@ -224,11 +220,8 @@
             <span class="dl-size" data-asset-size="macos">5.50 MB</span>
           </div>
           <div class="dl-actions">
-            <a class="btn-solid btn-full" data-dl-primary="macos" href="/kurocat/releases/v4.7.0/KuroCat-v4.7.0-macos-universal.dmg" download>
-              高速直链下载
-            </a>
-            <a class="dl-alt-link" data-dl-gh="macos" href="https://github.com/qianyiai/kurocat/releases/download/v4.7.0/KuroCat-v4.7.0-macos-universal.dmg" target="_blank" rel="noopener">
-              GitHub 官方源 ›
+            <a class="btn-solid btn-full" data-dl-primary="macos" href="https://github.com/xpfyg/kurocat/releases/download/v4.7.0/KuroCat-v4.7.0-macos-universal.dmg" target="_blank" rel="noopener">
+              从 GitHub 下载 macOS 版 ›
             </a>
           </div>
         </article>
@@ -265,7 +258,7 @@
         <div class="macos-tip-left">
           <div class="tip-title">🪟 Windows 提示「Could not find the WebView2 Runtime」怎么办？</div>
           <p class="tip-body">
-            常见于较老 Win10 / LTSC 精简版、卸过 Edge 浏览器或直接运行绿色单文件版的电脑（<strong>Win7 用户请直接下载下方专属兼容绿包版</strong>）。优先推荐安装上方<strong>正式安装版（setup.exe）</strong>，或点击右侧下载微软官方 WebView2 引导程序（1.8 MB），<strong>右键 → 以管理员身份运行</strong>装完即可全机生效。
+            常见于较老 Win10 / LTSC 精简版、卸过 Edge 浏览器或直接运行绿色单文件版的电脑。优先推荐安装上方<strong>正式安装版（setup.exe）</strong>，或点击右侧下载微软官方 WebView2 引导程序（1.8 MB），<strong>右键 → 以管理员身份运行</strong>装完即可全机生效。
           </p>
         </div>
         <a class="btn-outline" href="https://go.microsoft.com/fwlink/p/?LinkId=2124703" target="_blank" rel="noopener" style="white-space:nowrap;">
@@ -273,47 +266,12 @@
         </a>
       </div>
 
-      <!-- Windows 7 SP1 Dedicated Compatible Edition -->
-      <div class="macos-tip-card" id="win7-download">
+      <div class="macos-tip-card">
         <div class="macos-tip-left">
-          <div class="tip-title">🖥️ Windows 7 SP1（64 位）专属兼容绿包版（内置 WebView2 109）</div>
-          <p class="tip-body">
-            专为 Windows 7 SP1 64 位单独编译适配（原生 PE 6.01，零 Win8/Win10 DLL 依赖，内置微软官方最后一版支持 Win7 的 <strong>WebView2 109.0.1518.78</strong> 离线内核，并启用 Win7 原生 256 级逐像素透明抗锯齿渲染，无论是否开启 Aero 均无白底框与锯齿）。下载后请先<strong>全部解压</strong>，保持 <code>KuroCat.exe</code> 与 <code>WebView2Runtime</code> 同目录，直接双击运行即可。
-          </p>
+          <div class="tip-title">需要历史版本或其他平台？</div>
+          <p class="tip-body">所有已发布安装包与版本说明都归档在 GitHub Releases，可根据系统与架构选择对应附件。</p>
         </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
-          <a class="btn-outline" href="/kurocat/releases/v4.7.0/KuroCat-v4.7.0-win7-x64-portable.zip" download style="white-space:nowrap;">
-            下载 Win7 兼容绿包版（178.76 MB）
-          </a>
-          <a class="dl-alt-link" href="https://github.com/qianyiai/kurocat/releases/download/v4.7.0/KuroCat-v4.7.0-win7-x64-portable.zip" target="_blank" rel="noopener" style="font-size:12px;">
-            GitHub 官方源（Win7 绿包）›
-          </a>
-        </div>
-      </div>
-
-      <!-- Linux / KylinOS (银河麒麟 / 优麒麟 / UOS / Ubuntu) -->
-      <div class="macos-tip-card" id="linux-download">
-        <div class="macos-tip-left">
-          <div class="tip-title">🐧 Linux / 银河麒麟 KylinOS / 优麒麟 / Ubuntu（x86_64 &amp; ARM64）</div>
-          <p class="tip-body">
-            原生支持 X11 全局键鼠监听（免 root）与 Wayland <code>evdev</code> 降级、透明无边框置顶、鼠标穿透（按住 <code>Alt</code> 临时拖动）及开机自启。
-            优先推荐下载轻量 <strong>.deb 安装包（1.9 MB）</strong>（双击或 <code>sudo apt install ./KuroCat-*.deb</code>）；若较老系统源缺少 <code>libwebkit2gtk-4.1</code> 或无管理员权限，可直接运行 <strong>.AppImage 绿色版</strong>（<code>chmod +x</code> 后双击）。
-          </p>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
-          <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;">
-            <a class="btn-outline" href="/kurocat/releases/v4.7.0/KuroCat-v4.7.0-linux-amd64.deb" download style="white-space:nowrap;">
-              x86_64 .deb（1.87 MB）
-            </a>
-            <a class="btn-outline" href="/kurocat/releases/v4.7.0/KuroCat-v4.7.0-linux-arm64.deb" download style="white-space:nowrap;">
-              ARM64 飞腾/麒麟 .deb（1.83 MB）
-            </a>
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:flex-end;font-size:12px;">
-            <a class="dl-alt-link" href="/kurocat/releases/v4.7.0/KuroCat-v4.7.0-linux-amd64.AppImage" download>x86_64 AppImage（77 MB）›</a>
-            <a class="dl-alt-link" href="/kurocat/releases/v4.7.0/KuroCat-v4.7.0-linux-arm64.AppImage" download>ARM64 AppImage（75 MB）›</a>
-          </div>
-        </div>
+        <a class="btn-outline" href="https://github.com/xpfyg/kurocat/releases" target="_blank" rel="noopener" style="white-space:nowrap;">查看全部 Releases ›</a>
       </div>
 
       <!-- Game Fullscreen & Anti-Cheat Guide -->
@@ -337,11 +295,11 @@
       </div>
 
       <div class="showcase-stack">
-        <!-- Feature 0: Whale Girl (BigFish) 14s Vertical Demo Video -->
+        <!-- Feature 0: Whale Girl (BigFish) -->
         <article class="stage-card whale-demo-card reveal visible" id="whale-demo">
           <div class="split-grid whale-split-grid">
             <div>
-              <div class="eyebrow">New Skin · 🐳 BigFish (鲸鱼娘) · 14s Video</div>
+              <div class="eyebrow">New Skin · 🐳 BigFish (鲸鱼娘)</div>
               <h3 class="card-headline">新皮肤「大肥鱼」登场<br />鲸尾拍键 · 脸红大笑 · 密码捂眼</h3>
               <p class="card-body">
                 内置全新 <strong>🐳 大肥鱼（鲸鱼娘）</strong> 桌宠皮肤：支持<strong>左手点鼠标 + 右手敲键盘 + 大鲸尾甩拍回车/退格</strong>三线同时开工；
@@ -363,30 +321,11 @@
               </div>
               <div class="card-cta-row">
                 <button class="btn-lime" id="try-dafeiyu-btn" type="button">在上方画布切到大肥鱼试玩 ↑</button>
-                <a class="btn-outline" href="/kurocat/media/whale-douyin-14s.mp4" download="KuroCat-鲸鱼娘-14s竖屏演示.mp4">
-                  下载 1080P 竖屏演示（14s）
-                </a>
               </div>
             </div>
 
-            <div class="whale-video-stage">
-              <div class="phone-video-shell">
-                <video
-                  id="whale-demo-video"
-                  src="/kurocat/media/whale-douyin-14s.mp4"
-                  poster="/kurocat/assets/whale-douyin-poster.webp"
-                  autoplay
-                  muted
-                  loop
-                  playsinline
-                  controls
-                  preload="metadata"
-                ></video>
-              </div>
-              <div class="whale-video-bar">
-                <span class="whale-video-meta">1080×1920 · 60fps · 14s 含同步键鼠音效</span>
-                <button class="chip-btn" id="whale-sound-toggle" type="button">🔇 点此开启音效</button>
-              </div>
+            <div class="media-frame whale-preview-frame">
+              <img src="./assets/whale-douyin-poster.webp" alt="大肥鱼鲸鱼娘皮肤预览" loading="lazy" />
             </div>
           </div>
         </article>
@@ -420,7 +359,7 @@
               </div>
             </div>
             <div class="media-frame">
-              <img src="/kurocat/assets/showcase-108key.webp" alt="KuroCat 65% 与 108 键全尺寸及双视角对比展示" loading="lazy" />
+              <img src="./assets/showcase-108key.webp" alt="KuroCat 65% 与 108 键全尺寸及双视角对比展示" loading="lazy" />
             </div>
           </div>
         </article>
@@ -429,7 +368,7 @@
         <article class="stage-card reveal">
           <div class="split-grid reverse">
             <div class="media-frame">
-              <img src="/kurocat/assets/showcase-mouse.webp" alt="KuroCat 独立鼠标左右键识别与内置新版本提醒展示" loading="lazy" />
+              <img src="./assets/showcase-mouse.webp" alt="KuroCat 独立鼠标左右键识别与内置新版本提醒展示" loading="lazy" />
             </div>
             <div>
               <div class="eyebrow">Independent L / R / M · Auto Updater</div>
@@ -531,13 +470,11 @@
   </main>
 
   <footer>
-    <div>KuroCat · MIT Open Source · Built by <a class="footer-home" href="/">谦一 (Qianyi)</a></div>
+    <div><strong>xpfyg</strong> · KuroCat · MIT Open Source</div>
     <div class="footer-links">
-      <a href="/">谦一主页</a>
-      <a href="/pelican/">鹈鹕测试专区</a>
-      <a href="/game/drift/">Q1 Drift</a>
-      <a href="https://github.com/qianyiai/kurocat/releases" target="_blank" rel="noopener">所有版本 (Releases)</a>
-      <a href="https://github.com/qianyiai/kurocat" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/xpfyg" target="_blank" rel="noopener">xpfyg 的 GitHub</a>
+      <a href="https://github.com/xpfyg/kurocat/releases" target="_blank" rel="noopener">全部 Releases</a>
+      <a href="https://github.com/xpfyg/kurocat" target="_blank" rel="noopener">项目源码</a>
     </div>
   </footer>
 
