@@ -112,8 +112,95 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Import Developer ID Application certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${APPLE_CERTIFICATE:-}" ]]; then
+            echo "::warning::APPLE_CERTIFICATE is not set, skipping certificate import"
+            exit 0
+          fi
+
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+          CERT_PATH="$RUNNER_TEMP/developer-id-application.p12"
+
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$CERT_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" >/dev/null
+          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          rm -f "$CERT_PATH"
+
+          echo "=== Code signing identities in temporary keychain ==="
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
+          if [[ -n "${APPLE_SIGNING_IDENTITY:-}" ]]; then
+            if ! security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -F "$APPLE_SIGNING_IDENTITY"; then
+              echo "::error::APPLE_SIGNING_IDENTITY '$APPLE_SIGNING_IDENTITY' was not found in the imported certificate"
+              exit 1
+            fi
+            echo "Developer ID Application identity '$APPLE_SIGNING_IDENTITY' is ready"
+          fi
+
       - name: Build Tauri Universal macOS .app
-        run: npm run tauri -- build --target universal-apple-darwin --bundles app
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          if [[ -z "${APPLE_SIGNING_IDENTITY:-}" ]]; then
+            echo "::warning::APPLE_SIGNING_IDENTITY is not set, the build will not be Developer ID signed"
+            unset APPLE_SIGNING_IDENTITY
+          fi
+          npm run tauri -- build --target universal-apple-darwin --bundles app
+
+      - name: Verify Developer ID Application signature
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          APP_PATH="src-tauri/target/universal-apple-darwin/release/bundle/macos/KuroCat.app"
+          test -d "$APP_PATH"
+          echo "=== Signature details ==="
+          codesign -dv --verbose=4 "$APP_PATH" 2>&1 || true
+          if [[ -n "${APPLE_SIGNING_IDENTITY:-}" ]]; then
+            codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+            codesign -dv --verbose=4 "$APP_PATH" 2>&1 | grep -q "Authority=Developer ID Application"
+            codesign -dv --verbose=4 "$APP_PATH" 2>&1 | grep -q "TeamIdentifier="
+            echo "Verified Developer ID Application signature"
+          fi
+
+      - name: Notarize and staple macOS .app
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [[ -z "${APPLE_ID:-}" || -z "${APPLE_PASSWORD:-}" || -z "${APPLE_TEAM_ID:-}" ]]; then
+            echo "::warning::APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID not fully set, skipping notarization"
+            exit 0
+          fi
+          APP_PATH="src-tauri/target/universal-apple-darwin/release/bundle/macos/KuroCat.app"
+          ZIP_PATH="$RUNNER_TEMP/KuroCat-notarize.zip"
+          ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
+          xcrun notarytool submit "$ZIP_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple "$APP_PATH"
+          xcrun stapler validate "$APP_PATH"
+          spctl -a -vv -t exec "$APP_PATH"
 
       - name: Package Universal macOS .dmg and .app.tar.gz
         run: |
@@ -127,7 +214,8 @@ jobs:
           fi
           APP_PATH="src-tauri/target/universal-apple-darwin/release/bundle/macos/KuroCat.app"
           test -d "$APP_PATH"
-          echo "=== Verify macOS minimum version & Universal slices ==="
+          echo "=== Verify macOS minimum version, code signature & Universal slices ==="
+          codesign -dv --verbose=2 "$APP_PATH" 2>&1 || true
           plutil -p "$APP_PATH/Contents/Info.plist" | grep -i MinimumSystemVersion || true
           lipo -info "$APP_PATH/Contents/MacOS/KuroCat"
           lipo -info "$APP_PATH/Contents/MacOS/KuroCat" | grep -q 'x86_64'
@@ -142,6 +230,34 @@ jobs:
           test -s "KuroCat-${TAG}-macos-universal.dmg"
           test -s "KuroCat-${TAG}-macos-universal.app.tar.gz"
           ls -lh "KuroCat-${TAG}-macos-universal.dmg" "KuroCat-${TAG}-macos-universal.app.tar.gz"
+
+      - name: Sign and notarize macOS .dmg
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          DMG_PATH="$(ls KuroCat-*-macos-universal.dmg | head -n 1)"
+          test -f "$DMG_PATH"
+          if [[ -n "${APPLE_SIGNING_IDENTITY:-}" ]]; then
+            codesign --force --sign "$APPLE_SIGNING_IDENTITY" --timestamp "$DMG_PATH"
+            codesign --verify --verbose=2 "$DMG_PATH"
+          else
+            echo "::warning::APPLE_SIGNING_IDENTITY is not set, skipping DMG signing"
+          fi
+          if [[ -z "${APPLE_ID:-}" || -z "${APPLE_PASSWORD:-}" || -z "${APPLE_TEAM_ID:-}" ]]; then
+            echo "::warning::Notarization credentials not fully set, skipping DMG notarization"
+            exit 0
+          fi
+          xcrun notarytool submit "$DMG_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple "$DMG_PATH"
+          xcrun stapler validate "$DMG_PATH"
+          spctl -a -t open --context context:primary-signature -vv "$DMG_PATH"
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
