@@ -1,12 +1,12 @@
-import { KuroCatEngine, type KeyboardOrientation } from '../../src/catEngine';
+import { KuroCatEngine, type CatMood, type KeyboardOrientation } from '../../src/catEngine';
 import { catAudio } from '../../src/audio';
 import type { KeyboardLayoutId } from '../../src/keyboardLayout';
 import { BUILTIN_WEB_CATS } from './builtinCats';
 import { keyboardEventToVk } from './webKeyMap';
 
 const GITHUB_REPO = 'xpfyg/kurocat';
-const DEFAULT_RELEASE_TAG = 'v4.7.0';
-const DEFAULT_VERSION = '4.7.0';
+const DEFAULT_RELEASE_TAG = 'v4.8.0';
+const DEFAULT_VERSION = '4.8.0';
 
 interface ReleaseAsset {
   name: string;
@@ -132,6 +132,29 @@ function initPlayground(): void {
   engine.start();
   updateStatusPill();
 
+  // Mood preview row (desktop app switches moods automatically; the site lets visitors try each one)
+  const moodRow = document.getElementById('mood-row');
+  const setMoodPreview = (mood: CatMood | null) => {
+    engine.setMoodPreview(mood);
+    document.querySelectorAll('[data-mood]').forEach((el) => {
+      el.classList.toggle('active', (el as HTMLElement).dataset.mood === (mood ?? 'auto'));
+    });
+  };
+  const setMoodRowEnabled = (enabled: boolean) => {
+    moodRow?.classList.toggle('is-disabled', !enabled);
+    if (!enabled) setMoodPreview(null);
+  };
+  document.querySelectorAll('[data-mood]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const raw = (btn as HTMLElement).dataset.mood;
+      if (!raw || raw === 'auto') {
+        setMoodPreview(null);
+        return;
+      }
+      setMoodPreview(raw as CatMood);
+    });
+  });
+
   const ro = new ResizeObserver(() => engine.resize());
   ro.observe(viewport);
 
@@ -147,6 +170,7 @@ function initPlayground(): void {
       btn.addEventListener('click', () => {
         currentSkinId = skin.id;
         engine.setCatAppearance(skin.id, skin);
+        setMoodRowEnabled(skin.id !== 'dafeiyu');
         skinHost.querySelectorAll('.skin-btn').forEach((el) => {
           el.classList.toggle('active', (el as HTMLElement).dataset.skinId === skin.id);
         });
@@ -207,6 +231,7 @@ function initPlayground(): void {
       if (fish) {
         currentSkinId = fish.id;
         engine.setCatAppearance(fish.id, fish);
+        setMoodRowEnabled(false);
         skinHost?.querySelectorAll('.skin-btn').forEach((el) => {
           el.classList.toggle('active', (el as HTMLElement).dataset.skinId === fish.id);
         });
@@ -348,6 +373,7 @@ function initPlayground(): void {
   const startAutoDemo = () => {
     if (autoDemoTimer !== null) window.clearTimeout(autoDemoTimer);
     autoDemoRunning = true;
+    setMoodPreview(null);
     if (btnAutoDemo) {
       btnAutoDemo.classList.add('active');
       btnAutoDemo.textContent = '⏸ 停止演示';

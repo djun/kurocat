@@ -15,7 +15,7 @@ on:
         type: boolean
         default: false
       release_tag:
-        description: 'Optional tag label for artifact naming (e.g. v4.7.0)'
+        description: 'Optional tag label for artifact naming (e.g. v4.8.0)'
         type: string
         default: ''
 

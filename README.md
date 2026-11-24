@@ -1,82 +1,100 @@
-# 🐈‍⬛ KuroCat
+# KuroCat
 
-轻量级 **Windows（Win11/10 & Win7 SP1）/ macOS（10.15+ Apple Silicon & Intel）/ Linux（银河麒麟 KylinOS / Ubuntu / UOS）** 透明置顶桌面打字猫咪伴侣（开箱自带 **6 款手绘猫咪皮肤 + 🐳 大肥鱼（鲸鱼娘）**：经典小黑猫、暖奶茶布偶猫、大橘猫、三花猫、奶牛猫、暹罗猫、大肥鱼，支持**输密码自动闭眼/捂眼防偷窥**，并原生内置 **MCP 协议服务端**，支持用 AI 一句话定制或新增更多你自己的猫咪！），基于 **Tauri v2（Rust 全局原生钩子 + 内置 MCP 引擎 + HTML5 Canvas 2D）** 打造。单文件轻量低耗，零外部运行时依赖。
+一只住在桌面上的打字小黑猫。透明、置顶、极轻量，你敲键盘它就跟着敲；支持 Windows 与 macOS，内置 7 款皮肤、6 种实时心情、密码防偷窥、65% / 108 键切换和 AI 捏猫。
 
-## 🌐 官方网站
+[官方网站](https://37lj1lcl30ek76wo2d9.traesite.cn/) · [在线试玩](https://37lj1lcl30ek76wo2d9.traesite.cn/#playground) · [下载安装](https://github.com/xpfyg/kurocat/releases) · [项目源码](https://github.com/xpfyg/kurocat)
+
+## 这是什么
+
+KuroCat 是一个开源桌面宠物：一只会随着你的键盘和鼠标动作敲键盘的小猫，常驻在桌面右下角。
+
+技术上使用 **Tauri v2 + Rust 原生全局键鼠钩子 + HTML5 Canvas 2D**，没有 Electron 运行时，单文件安装包约 1.6 MB，常驻内存约 20 MB 级别。
+
+## 官网
 
 https://37lj1lcl30ek76wo2d9.traesite.cn/
 
-在线试玩、了解功能并下载 Windows / macOS 版本。
+官网支持在浏览器里直接试玩：切换 7 款皮肤、6 种心情、65% / 108 键布局、正反视角、密码防偷窥和无级缩放，无需安装。
 
-## 🎬 产品预览
+## 功能特性
 
-<img src="docs/playground-demo.webp" alt="KuroCat 网页试玩预览：7 款皮肤、65%/108 键与密码防偷窥" width="640" />
+### 皮肤与动画
 
-内置 6 款猫咪与 🐳 大肥鱼，支持 65% / 108 键、正反双视角、密码防偷窥和 20%–150% 无级缩放。
+- 6 款手绘猫咪：经典小黑猫、暖奶茶布偶猫、大橘猫、三花猫、奶牛猫、暹罗猫
+- 🐳 大肥鱼（鲸鱼娘）：左手点鼠标、右手敲键盘、鲸尾甩拍功能键，手速越快越脸红
+- 右键或托盘 0.1 秒无缝换肤，无需重启
 
-## 📥 直接下载使用（Windows / Win7 / macOS / Linux）
+### 情绪系统
 
-前往 [Releases](https://github.com/xpfyg/kurocat/releases) 页面或直接点击下方最新 **`v4.7.0`** 安装包下载（所有版本均内置 **20%–150% 丝滑缩放滑动条**、右键一键切换 **65% 紧凑 / 108 全尺寸小键盘** 与 **面向猫咪 / 面向观众** 方向、**输密码自动闭眼/捂眼防偷窥**、**按住 `Alt` 随时解锁鼠标穿透**、**无边框 / 全屏优化游戏持续 Z 序置顶守护**、托盘一键 **以管理员身份重启（捕获游戏键鼠）** & **游戏反作弊护航暂停** 与 App 内自动新版本提醒及一键自升级）：
+- **6 种实时心情**：平常、好奇、开心、放松、烦躁、犯困，全部由真实输入自动驱动
+- 光标靠近时好奇：瞳孔放大、追瞳增强、耳朵上提，偶尔冒出问号
+- 摸头时开心：眯眼、腮红与爱心粒子；播放音乐时放松并飘出音符
+- 45 秒无操作开始犯困：眼睛缓慢闭合、呼吸变慢、低头并飘出 Zzz，按键或摸头立即清醒
+- 连续打字 16 秒进入烦躁；密码模式优先级最高，会覆盖并隐藏所有心情特效
 
-- **🪟 Windows 10 / 11（65% 经典安装版 · `v4.7.0`）**：[**`KuroCat-4.7.0-x64-setup.exe`**](https://github.com/xpfyg/kurocat/releases/download/v4.7.0/KuroCat-4.7.0-x64-setup.exe)（约 1.62 MB）
-  - 默认 65% 紧凑机械键盘，自动创建桌面 **`KuroCat`** 图标、开始菜单与系统卸载入口；右键或托盘随时一键切换 **108 键全尺寸小键盘**、**🐳 大肥鱼（鲸鱼娘）** 与 App 内一键更新。
-  - **常见问题说明**：
-    - **Edge / Chrome 浏览器提示「通常不会下载 `.exe`」怎么办？**（开源免费软件未购商业代码签名证书，全量源码公开可放心信任）：
-      - **Edge 浏览器**：鼠标移到该下载条上 → 点右侧 **三个点 `···`** → 点 **「保留」** → 弹窗出现「删除」按钮时，点开旁边的 **下箭头 `▾`（显示更多）** → 选择 **「仍然保留」** 即可完成下载。
-      - **Chrome 浏览器**：按 `Ctrl + J` 打开下载记录 → 点 **「保留危险文件」** → **「仍然保留」**。
-      - **双击安装若弹出蓝框「Windows 已保护你的电脑」**：点 **「更多信息」** → 点 **「仍要运行」** 即可。
-    - 极少数老版 Win10 / LTSC 精简版若提示缺少 `WebView2 Runtime`，安装微软官方 1.8 MB 引导程序（右键「以管理员身份运行」）即可：[`MicrosoftEdgeWebview2Setup.exe`](https://go.microsoft.com/fwlink/p/?LinkId=2124703)。
-    - **游戏全屏 / 管理员权限 / 直播提示**：单机与常规游戏在 Win10/11 全屏优化（FSO）或「无边框窗口化」下内置持续 Z 序置顶守卫且绝不抢焦点（建议开启「锁定鼠标穿透」，按 `Alt` 随时解锁）；若游戏本身以管理员权限运行导致无法捕获键鼠，右键系统托盘点击 **「以管理员身份重启（捕获游戏键鼠）」** 即可无缝提权；直播录屏推荐 OBS 添加「窗口捕获」叠加；玩无畏契约 / 三角洲行动等强内核反作弊网游建议右键托盘开启 **「暂停监听并隐藏（游戏反作弊护航）」**。
-- **🖥️ Windows 7 SP1（64 位专属兼容绿包版 · `v4.7.0`）**：[**`KuroCat-v4.7.0-win7-x64-portable.zip`**](https://github.com/xpfyg/kurocat/releases/download/v4.7.0/KuroCat-v4.7.0-win7-x64-portable.zip)（178.76 MB）
-  - 原生 PE 6.01 编译（零 Win8/Win10 DLL 依赖），内置微软官方最后一版支持 Win7 的离线 **WebView2 109.0.1518.78** 运行库，并搭载 **Win7 原生 256 级逐像素透明抗锯齿渲染（`UpdateLayeredWindow`）**，开不开 Aero 均无白底框与锯齿；解压后保持 `KuroCat.exe` 与 `WebView2Runtime` 同目录直接双击即可运行。
-- **🍎 macOS 10.15 Catalina+（Apple Silicon M1–M4 & Intel 通用版 · `v4.7.0`）**：[**`KuroCat-v4.7.0-macos-universal.dmg`**](https://github.com/xpfyg/kurocat/releases/download/v4.7.0/KuroCat-v4.7.0-macos-universal.dmg)（5.50 MB）
-  - 打开 `.dmg` 将 `KuroCat.app` 拖入「应用程序」文件夹运行，内置 65% / 108 键切换与全部 7 款皮肤（含 🐳 大肥鱼鲸鱼娘）。
-  - **首次打开说明（开源未公证应用）**：若提示「无法验证开发者」或「已损坏」，在终端执行一次 `xattr -cr /Applications/KuroCat.app` 后即可正常打开（后续 App 内一键升级会自动处理，无需再敲命令）。
-  - **键盘与鼠标监听权限**：首次启动会自动弹出系统授权引导，请在「系统设置 → 隐私与安全性」中同时勾选 **「辅助功能」与「输入监控」** 里的 `KuroCat`（即开即生效，兼容 Karabiner-Elements；若覆盖升级后权限未生效，在列表中选中 `KuroCat` 点左下角 `-` 删除再重新 `+` 添加即可）。
-  - **macOS Stdio MCP 路径**：`/Applications/KuroCat.app/Contents/MacOS/KuroCat`（参数 `--mcp`），或在桌宠运行时直接连接 `http://127.0.0.1:27420/mcp`。
-- **🐧 Linux / 银河麒麟 KylinOS / 优麒麟 / Ubuntu / UOS（`v4.7.0`）**：
-  - **x86_64（Intel / AMD / 兆芯 / 海光）**：[**`.deb`（1.87 MB）**](https://github.com/xpfyg/kurocat/releases/download/v4.7.0/KuroCat-v4.7.0-linux-amd64.deb) · [**`.AppImage`（77.01 MB）**](https://github.com/xpfyg/kurocat/releases/download/v4.7.0/KuroCat-v4.7.0-linux-amd64.AppImage)
-  - **ARM64（飞腾 / 鲲鹏 / 树莓派）**：[**`.deb`（1.83 MB）**](https://github.com/xpfyg/kurocat/releases/download/v4.7.0/KuroCat-v4.7.0-linux-arm64.deb) · [**`.AppImage`（75.19 MB）**](https://github.com/xpfyg/kurocat/releases/download/v4.7.0/KuroCat-v4.7.0-linux-arm64.AppImage)
-  - 原生动态加载 X11 `XRecord`（免 root 捕获全局键鼠，Wayland 自动支持 `evdev` 回退）。
+### 键盘与鼠标
 
-## ✨ 核心特性
+- **65% 紧凑** 与 **108 键全尺寸** 一键切换，108 键包含完整 F 区、编辑区和数字小键盘
+- **面向猫咪 / 面向观众** 双视角，同步重投影 3D 梯形透视
+- 鼠标左键、右键、中键/滚轮独立识别高亮，左右键可同时按住
+- 按键时弹出 3D 键帽气泡，可随时隐藏
 
-<table>
-  <tr>
-    <td align="center" width="50%">
-      <img src="website/public/assets/showcase-108key.webp" alt="65% 紧凑 / 108 键全尺寸 × 面向猫咪 / 面向观众双视角" />
-      <br/><sub>65% 紧凑 / 108 键全尺寸 × 面向猫咪 / 面向观众双视角</sub>
-    </td>
-    <td align="center" width="50%">
-      <img src="website/public/assets/showcase-mouse.webp" alt="鼠标左/右键独立高亮 + 自动更新提醒" />
-      <br/><sub>鼠标左/右键独立双色高亮 + App 内自动更新提醒</sub>
-    </td>
-  </tr>
-</table>
+### 隐私保护
 
-- **7 款内置皮肤（6 款猫咪 + 🐳 大肥鱼鲸鱼娘）+ MCP 无限自定义**：
-  - **🐈‍⬛ 经典小黑猫** / **🐱 暖奶茶布偶猫** / **🍊 大橘猫**（虎斑 `M` 额纹 + 环纹尾） / **🌸 三花猫** / **🐄 奶牛猫**（燕尾服 + 白手套） / **🤎 暹罗猫**（挖煤重点色） / **🐳 大肥鱼（鲸鱼娘）**（三肢同步键鼠 + 鲸鱼尾拍打右侧功能键带水花特效 + 稳定 4 表情与手速腮红），右键或系统托盘 0.1 秒一键无缝切换。
-  - **🙈 系统级输密码自动闭眼 / 捂眼防偷窥**：Windows（UI Automation `CurrentIsPassword` + Win32 `ES_PASSWORD`）与 macOS（`IsSecureEventInputEnabled` + `AXSecureTextField`）自动感知密码输入框，Rust 底层钩子直接拦截真实按键不外传——猫咪温柔闭眼、大肥鱼双手捂眼并覆盖键盘防窥遮罩，可右键/托盘随时开关。
-  - **🤖 原生内置 MCP 服务（AI 一句话捏自己的猫）**：无需装 Node.js 或 Python，直接把自家猫照片发给 **Claude Desktop / Cursor / Antigravity / Windsurf / Cline**，AI 通过内置 MCP 工具自动生成橘猫（虎斑 `M` 额纹 + 环纹尾）、三花猫、奶牛猫、暹罗猫、英短蓝猫或带专属胎记斑块的独一无二桌宠，**0.4 秒热更新到桌面、无需重启**！
-- **65% / 108 键全尺寸可选 + 键盘正反视角可选 + 鼠标左右键独立识别**：
-  - 支持 **65% 紧凑机械键盘** 与 **108 键全尺寸机械键盘（完整 F1~F12、PrtSc/ScrLk/Pause、顶部 4 颗多媒体键、独立方向/编辑区与完整数字小键盘，含 2U 竖长 `+` 与独立小回车 `Num↵`）**，右键或托盘一键切换并自动平滑调整窗口宽度。
-  - 支持 **「面向猫咪（180° 真实视角）」** 与 **「面向观众（正向字母易读视角）」** 自由切换，同步重投影 3D 梯形透视与鼠标左右键朝向！
-  - 鼠标左键（`L`）、右键（`R`）、中键/滚轮完全独立区分高亮（左键用猫咪主强调色、右键用高对比珊瑚橙/天蓝色、各自带 3D 按下阴影与迷你 `LMB`/`RMB` 气泡），猫爪握鼠时自动露出双键并向对应按键偏移轻拍，支持左右键同时按住！
-  - 纯打字时头部与上身随敲击节奏灵动左右晃动歪头，未敲键一侧自动蜷爪收在胸前。
-- **App 内自动新版本提醒 & 一键升级**：启动后及定时静默检测 GitHub Releases 新版本，有更新时自动在猫头上方弹出轻量提醒条，右键猫咪或系统托盘点 **「检查更新」** 即可自动下载、SHA-256 校验并静默安装重启（Windows 安装版 / 绿色单文件版 / macOS 通用版均支持）。
-- **摸头眯眼与呼噜互动**：鼠标移到猫头上自动切换为黑白描边小手光标，来回抚摸即触发慵懒细眯眼表情，并伴随 Web Audio 实时合成的温柔猫咪呼噜声（默认开启，可随时开关，不干扰自身键鼠声音）。
-- **错落弹跳 3D 按键气泡**：键盘上方实时弹出白底立体键帽，支持一键隐藏（输密码更安心）。
-- **智能鼠标穿透 & 系统托盘**：透明区域自动点击穿透不遮挡办公或游戏，右键猫咪或系统托盘可一键切换外观、使用 **20%–150% 丝滑滑动条**无级调节尺寸、开关 MCP 服务并**一键复制 MCP 配置**。
+- 系统级识别密码输入框：Windows 使用 UI Automation 与 `ES_PASSWORD`，macOS 使用 `IsSecureEventInputEnabled` 与 `AXSecureTextField`
+- 检测到密码框时猫咪自动闭眼，大肥鱼双手捂眼，同时隐藏所有键帽与气泡
+- Rust 底层钩子拦截按键，不向外传递
 
-## 🤖 MCP 接入指南（用 AI 改猫 / 加自己的猫）
+### 交互与系统集成
 
-KuroCat `v4.0.0+` 单文件程序原生内置 **Stdio** 与 **本机 Streamable HTTP（`127.0.0.1:27420`）** 双模式 MCP Server，无需任何额外依赖！
+- 摸头互动：光标变成小手，来回抚摸触发眯眼表情和 Web Audio 实时合成的呼噜声
+- **20%–150% 无级缩放**，右下角锚定不漂移
+- 透明区域点击穿透，按住 `Alt` 临时解锁拖动或右键
+- 无边框 / 全屏优化游戏下的持续 Z 序置顶，不抢焦点
+- 托盘支持以管理员身份重启（捕获游戏键鼠）与反作弊护航暂停
+- App 内自动检测新版本，SHA-256 校验后静默升级
 
-### 最快接入方式
-1. 运行 `KuroCat`，右键猫咪 → 确认勾选 **「开启 MCP 扩展」** → 点击 **「复制 MCP 配置」**。
-2. 粘贴到你常用的 AI 客户端 MCP 配置文件（Claude Desktop / Cursor / Antigravity / Windsurf / Cline）：
+### AI 捏猫（MCP）
 
-**方式 A：Stdio 模式（通用推荐，所有 MCP 客户端均支持）**
+程序内置 **Stdio** 与 **本机 Streamable HTTP（`127.0.0.1:27420`）** 两种 MCP 服务端，无需 Node.js 或 Python。把自家猫的照片发给 Claude Desktop、Cursor、Antigravity、Windsurf 等客户端，即可让 AI 生成专属花色并热更新上屏。
+
+## 下载安装
+
+安装包由 GitHub Actions 自动编译并发布到 [Releases](https://github.com/xpfyg/kurocat/releases)。
+
+| 平台 | 安装包 | 说明 |
+| --- | --- | --- |
+| Windows 10 / 11 (x64) | [KuroCat-4.8.0-x64-setup.exe](https://github.com/xpfyg/kurocat/releases/download/v4.8.0/KuroCat-4.8.0-x64-setup.exe) | NSIS 安装版，自动创建桌面图标与卸载入口 |
+| macOS 10.15+ | [KuroCat-v4.8.0-macos-universal.dmg](https://github.com/xpfyg/kurocat/releases/download/v4.8.0/KuroCat-v4.8.0-macos-universal.dmg) | Universal 通用镜像，兼容 Apple Silicon 与 Intel |
+| Linux x86_64 | [.deb](https://github.com/xpfyg/kurocat/releases/download/v4.8.0/KuroCat-v4.8.0-linux-amd64.deb) · [.AppImage](https://github.com/xpfyg/kurocat/releases/download/v4.8.0/KuroCat-v4.8.0-linux-amd64.AppImage) | Debian / Ubuntu / 麒麟 / UOS |
+| Linux ARM64 | [.deb](https://github.com/xpfyg/kurocat/releases/download/v4.8.0/KuroCat-v4.8.0-linux-arm64.deb) · [.AppImage](https://github.com/xpfyg/kurocat/releases/download/v4.8.0/KuroCat-v4.8.0-linux-arm64.AppImage) | 飞腾 / 鲲鹏 / 树莓派 |
+
+### Windows 首次运行
+
+开源软件未购买商业代码签名证书，Edge / Chrome 可能提示「通常不会下载」：
+
+1. 在下载记录上点右侧 `···` → 「保留」
+2. 弹窗出现「删除」时，点旁边下箭头 `▾` → 「仍然保留」
+3. 安装时若出现「Windows 已保护你的电脑」，点「更多信息」→「仍要运行」
+
+极少数精简版 Win10 缺少 WebView2 Runtime，可安装微软官方引导程序：[MicrosoftEdgeWebview2Setup.exe](https://go.microsoft.com/fwlink/p/?LinkId=2124703)。
+
+### macOS 首次运行
+
+未公证应用首次打开若提示「无法验证开发者」或「已损坏」，在终端执行一次：
+
+```bash
+xattr -cr /Applications/KuroCat.app
+```
+
+随后在「系统设置 → 隐私与安全性」中，为 `KuroCat` 勾选 **辅助功能** 和 **输入监控**。
+
+## MCP 接入
+
+运行 KuroCat，右键猫咪 → 开启「MCP 扩展」→ 点击「复制 MCP 配置」，粘贴到客户端配置文件中。
+
+Stdio 模式（Windows 示例）：
+
 ```json
 {
   "mcpServers": {
@@ -88,7 +106,8 @@ KuroCat `v4.0.0+` 单文件程序原生内置 **Stdio** 与 **本机 Streamable 
 }
 ```
 
-**方式 B：本机 HTTP 模式（桌宠运行时直接连接）**
+本机 HTTP 模式（桌宠运行时可用）：
+
 ```json
 {
   "mcpServers": {
@@ -99,41 +118,51 @@ KuroCat `v4.0.0+` 单文件程序原生内置 **Stdio** 与 **本机 Streamable 
 }
 ```
 
-### 试试这样跟 AI 说
-- *「帮我用 KuroCat MCP 新增一只大橘猫（虎斑纹 + 白手套 + 橘色高亮键盘），并马上切过去」*
-- *「看这张我家三花猫的照片，用 KuroCat MCP 按它的花色和斑点给我捏一只专属桌宠！」*
-- *「把桌宠放大到 125%，关闭悬浮按键气泡，切回小黑猫」*
+内置工具：
 
-### 内置 MCP 工具清单
-| 工具名 | 功能说明 |
+| 工具 | 作用 |
 | --- | --- |
-| `list_cats` | 查看所有内置与自定义猫咪外观及当前激活的猫 |
-| `get_cat_schema` | 获取完整花色参数规范、6 种花纹（`solid`/`bicolor`/`tuxedo`/`tabby`/`calico`/`siamese`）、自定义斑点坐标与常见品种模板 |
-| `upsert_cat` | 新增或修改任意自定义猫咪（毛色、花纹、耳朵、瞳色、尾巴、白手套、高亮色、自定义胎记斑块），实时热更新上屏 |
-| `switch_cat` | 按 ID 秒切桌面当前显示的猫咪 |
-| `delete_cat` | 删除指定自定义猫咪（或重置内置外观） |
-| `get_settings` / `update_settings` | 读取或实时修改缩放比例、按键气泡、呼噜声、置顶、穿透锁定与开机自启 |
+| `list_cats` | 列出内置与自定义皮肤 |
+| `get_cat_schema` | 获取花色参数规范与花纹模板 |
+| `upsert_cat` | 新增或修改自定义猫咪，实时热更新 |
+| `switch_cat` | 切换当前皮肤 |
+| `delete_cat` | 删除自定义皮肤 |
+| `get_settings` / `update_settings` | 读取或修改缩放、气泡、呼噜声、置顶等设置 |
 
-自定义猫咪配置保存在：
-- **Windows**：`%APPDATA%\kuro-cat-pet\cats.json`
-- **macOS**：`~/Library/Application Support/kuro-cat-pet/cats.json`
+自定义皮肤保存在：
 
-也可手动编辑，桌宠自动实时热重载。
+- Windows：`%APPDATA%\kuro-cat-pet\cats.json`
+- macOS：`~/Library/Application Support/kuro-cat-pet/cats.json`
 
-## 🛠️ 本地源码构建
+## 从源码构建
 
-前置环境：Windows 10/11 或 macOS 11+、Node.js 18+、Rust 工具链（`cargo`）。
+前置环境：Node.js 18+、Rust 工具链、系统对应的 Tauri 依赖。
 
 ```bash
 git clone https://github.com/xpfyg/kurocat.git
 cd kurocat
 npm install
-npm run tauri:dev      # 本地热更新调试
-npm run tauri:build    # 编译 Release 可执行文件与安装包
+
+npm run tauri:dev      # 本地调试
+npm run tauri:build    # 编译安装包
+npm run build:web      # 构建官网静态站（输出 dist-web）
 ```
 
-## 📄 开源协议与原项目
+## 自动发布
 
-本项目基于 [MIT License](LICENSE) 开源。
+推送 `v*` 标签即触发构建：Windows 生成 NSIS 安装包，macOS 生成 Universal DMG 与 `app.tar.gz`，Linux 生成 deb 与 AppImage，全部完成后自动发布 Release。
 
-原项目：[qianyiai/kurocat](https://github.com/qianyiai/kurocat)。
+```bash
+git tag v4.8.0
+git push origin v4.8.0
+```
+
+也可以在 Actions 中手动运行 workflow，并填写 `release_tag` 指定版本。
+
+## 开源协议
+
+本项目基于 [MIT License](LICENSE) 开源。第三方素材与依赖遵循各自许可证。
+
+---
+
+原项目：[qianyiai/kurocat](https://github.com/qianyiai/kurocat)
