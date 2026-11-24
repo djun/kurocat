@@ -406,7 +406,7 @@ fn start_storage_watcher(app: AppHandle) {
         let mut last_settings_m = file_mtime(&s_path);
 
         loop {
-            std::thread::sleep(Duration::from_millis(400));
+            std::thread::sleep(Duration::from_millis(1500));
             let cur_c = file_mtime(&c_path);
             let cur_s = file_mtime(&s_path);
             if cur_c != last_cats_m || cur_s != last_settings_m {
@@ -963,24 +963,33 @@ fn start_hit_test_loop(
         let mut last_cursor: (i32, i32) = (i32::MIN, i32::MIN);
         let mut last_alt_override = false;
         let mut last_effective_locked = false;
+        let mut cached_visible = true;
+        let mut cached_sf: f64 = 1.0;
+        let mut cached_rect: Option<(i32, i32, f64, f64)> = None;
+        let mut last_geom_refresh = Instant::now() - Duration::from_secs(5);
+        let mut next_sleep_ms: u64 = 33;
         #[cfg(windows)]
         let mut drift_ticks: u8 = 0;
         #[cfg(windows)]
         let mut last_fg_hwnd: isize = 0;
         #[cfg(windows)]
-        let mut topmost_check_ticks: u8 = 0;
+        let mut last_topmost_check = Instant::now() - Duration::from_secs(5);
+        #[cfg(windows)]
+        let mut fg_changed_at: Option<Instant> = None;
         #[cfg(windows)]
         let mut fg_above_attempts: u8 = 0;
         #[cfg(windows)]
         let mut last_topmost_reassert = Instant::now() - Duration::from_secs(5);
 
         loop {
-            std::thread::sleep(Duration::from_millis(25));
+            std::thread::sleep(Duration::from_millis(next_sleep_ms));
 
             if paused_guard.load(Ordering::Relaxed) {
+                next_sleep_ms = 120;
                 continue;
             }
             let Some(win) = app.get_webview_window("main") else {
+                next_sleep_ms = 120;
                 continue;
             };
             #[cfg(windows)]
@@ -988,59 +997,85 @@ fn start_hit_test_loop(
             #[cfg(not(windows))]
             let is_win7_ulw = false;
 
-            if is_win7_ulw {
-                #[cfg(windows)]
-                if !win7_layered::is_visible() {
+            let is_menu = menu_open.load(Ordering::Relaxed);
+            let is_drag = dragging.load(Ordering::Relaxed);
+            let is_banner = update_banner_open.load(Ordering::Relaxed);
+
+            let need_geom_refresh = cached_rect.is_none()
+                || is_drag
+                || is_menu
+                || is_banner
+                || last_geom_refresh.elapsed() >= Duration::from_millis(500);
+
+            if need_geom_refresh {
+                cached_visible = if is_win7_ulw {
+                    #[cfg(windows)]
+                    {
+                        win7_layered::is_visible()
+                    }
+                    #[cfg(not(windows))]
+                    unreachable!()
+                } else {
+                    win.is_visible().unwrap_or(false)
+                };
+                if !cached_visible {
+                    last_geom_refresh = Instant::now();
+                    next_sleep_ms = 150;
                     continue;
                 }
-            } else if !win.is_visible().unwrap_or(false) {
+                cached_sf = win.scale_factor().unwrap_or(1.0);
+                let next_rect = if is_win7_ulw {
+                    #[cfg(windows)]
+                    {
+                        win7_layered::get_rect()
+                            .map(|(ux, uy, uw, uh)| (ux, uy, uw.max(1) as f64, uh.max(1) as f64))
+                    }
+                    #[cfg(not(windows))]
+                    unreachable!()
+                } else {
+                    match (win.outer_position(), win.outer_size()) {
+                        (Ok(pos), Ok(size)) => {
+                            Some((pos.x, pos.y, size.width.max(1) as f64, size.height.max(1) as f64))
+                        }
+                        _ => None,
+                    }
+                };
+                if let Some(r) = next_rect {
+                    cached_rect = Some(r);
+                }
+                last_geom_refresh = Instant::now();
+            }
+
+            if !cached_visible {
+                next_sleep_ms = 150;
                 continue;
             }
-            let sf = win.scale_factor().unwrap_or(1.0);
+            let sf = cached_sf;
             let Some((cx, cy)) = get_cursor_pos(sf) else {
+                next_sleep_ms = 80;
+                continue;
+            };
+            let Some((win_x, win_y, w, h)) = cached_rect else {
+                next_sleep_ms = 80;
                 continue;
             };
 
-            let (win_x, win_y, w, h) = if is_win7_ulw {
-                #[cfg(windows)]
-                {
-                    let Some((ux, uy, uw, uh)) = win7_layered::get_rect() else {
-                        continue;
-                    };
-                    (ux, uy, uw.max(1) as f64, uh.max(1) as f64)
-                }
-                #[cfg(not(windows))]
-                unreachable!()
-            } else {
-                let Ok(pos) = win.outer_position() else {
-                    continue;
-                };
-                let Ok(size) = win.outer_size() else {
-                    continue;
-                };
-                (pos.x, pos.y, size.width.max(1) as f64, size.height.max(1) as f64)
-            };
             let rx = (cx - win_x) as f64 / w;
             let ry = (cy - win_y) as f64 / h;
             let inside = rx >= 0.0 && rx <= 1.0 && ry >= 0.0 && ry <= 1.0;
-            let (locked, always_on_top, is_108, cur_scale, layout_str) = {
+            let (locked, always_on_top, is_108, cur_scale) = {
                 let s = settings.lock().unwrap();
                 (
                     s.click_through_locked,
                     s.always_on_top,
                     s.keyboard_layout == "108",
                     s.scale.clamp(0.20, 1.50),
-                    s.keyboard_layout.clone(),
                 )
             };
 
-            let is_menu = menu_open.load(Ordering::Relaxed);
-            let is_drag = dragging.load(Ordering::Relaxed);
-            let is_banner = update_banner_open.load(Ordering::Relaxed);
-
             // Continuous ADR-0096-style Windows Z-order guard for borderless & FSO fullscreen games:
             // checks actual topmost band membership + EnumWindows stacking order against the
-            // foreground window every ~150ms (and shortly after foreground switches), reasserting
+            // foreground window every ~500ms (and ~60ms after foreground switches), reasserting
             // HWND_TOPMOST strictly on the window owner thread without stealing focus (SWP_NOACTIVATE).
             #[cfg(windows)]
             if always_on_top && !is_menu && !is_drag {
@@ -1049,11 +1084,15 @@ fn start_hit_test_loop(
                 if fg_id != last_fg_hwnd {
                     last_fg_hwnd = fg_id;
                     fg_above_attempts = 0;
-                    topmost_check_ticks = 4; // trigger a prompt Z-order check ~50ms after focus switch
+                    fg_changed_at = Some(Instant::now());
                 }
-                topmost_check_ticks = topmost_check_ticks.saturating_add(1);
-                if topmost_check_ticks >= 6 {
-                    topmost_check_ticks = 0;
+                let prompt_due = fg_changed_at
+                    .map(|t| t.elapsed() >= Duration::from_millis(60))
+                    .unwrap_or(false);
+                let periodic_due = last_topmost_check.elapsed() >= Duration::from_millis(500);
+                if prompt_due || periodic_due {
+                    fg_changed_at = None;
+                    last_topmost_check = Instant::now();
                     let our_hwnd_opt = if is_win7_ulw {
                         win7_layered::hwnd()
                     } else {
@@ -1114,7 +1153,7 @@ fn start_hit_test_loop(
                     }
                 }
             } else {
-                topmost_check_ticks = 0;
+                fg_changed_at = None;
                 fg_above_attempts = 0;
             }
             let alt_override = input_hook::is_alt_pressed();
@@ -1122,7 +1161,11 @@ fn start_hit_test_loop(
 
             // Map window-relative (rx, ry) into exact pet-local (pet_rx, pet_ry),
             // since at small scales (20%..90%) the pet is anchored bottom-right inside a min-safe menu window!
-            let (bw, bh) = base_dimensions(&layout_str);
+            let (bw, bh) = if is_108 {
+                (BASE_WIDTH_108, BASE_HEIGHT_108)
+            } else {
+                (BASE_WIDTH, BASE_HEIGHT)
+            };
             let win_log_w = (w / sf).max(1.0);
             let win_log_h = (h / sf).max(1.0);
             let pet_w_frac = ((bw * cur_scale) / win_log_w).clamp(0.05, 1.0);
@@ -1206,7 +1249,8 @@ fn start_hit_test_loop(
                 }
             }
 
-            if (cx, cy) != last_cursor
+            let cursor_moved = (cx, cy) != last_cursor;
+            if cursor_moved
                 || alt_override != last_alt_override
                 || effective_locked != last_effective_locked
             {
@@ -1224,6 +1268,14 @@ fn start_hit_test_loop(
                     },
                 );
             }
+
+            // Adaptive polling: responsive ~30Hz while hovering/moving/interacting,
+            // relaxed ~12.5Hz when cursor is idle outside the pet window.
+            next_sleep_ms = if cursor_moved || inside || is_menu || is_drag || is_banner || alt_override {
+                33
+            } else {
+                80
+            };
         }
     });
 }

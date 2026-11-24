@@ -7,13 +7,11 @@
 //! The watcher polls every few seconds and emits `kuro-media` with the current
 //! state, so the frontend simply toggles the cat's relaxed mood.
 
-#[cfg(any(target_os = "macos", windows))]
-use std::process::Command;
 use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
-const POLL_INTERVAL: Duration = Duration::from_secs(5);
+const POLL_INTERVAL: Duration = Duration::from_secs(8);
 
 /// Lower-case path / executable fragments of popular music players.
 /// Matched against the full macOS executable path, Windows image names,
@@ -104,28 +102,94 @@ fn env_force_music() -> Option<bool> {
 
 #[cfg(target_os = "macos")]
 fn music_app_running() -> bool {
-    // `comm` alone is often just the app name ("Spotify"), so include the full
-    // executable path (`args`) to match `/Applications/Spotify.app/...` reliably.
-    let Ok(output) = Command::new("/bin/ps")
-        .args(["-axo", "comm=,args="])
-        .output()
-    else {
-        return false;
-    };
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    stdout.lines().any(line_is_music_app)
+    use std::ffi::{c_int, c_void};
+
+    // PROC_PIDPATHINFO_MAXSIZE = 4 * MAXPATHLEN (4096) on macOS.
+    const PROC_PIDPATHINFO_MAXSIZE: usize = 4096;
+
+    extern "C" {
+        fn proc_listallpids(buffer: *mut c_void, buffersize: c_int) -> c_int;
+        fn proc_pidpath(pid: c_int, buffer: *mut c_void, buffersize: u32) -> c_int;
+    }
+
+    // Native libproc lookup: zero fork/exec overhead compared to spawning `/bin/ps`.
+    unsafe {
+        let count_hint = proc_listallpids(std::ptr::null_mut(), 0);
+        if count_hint <= 0 {
+            return false;
+        }
+        let capacity = (count_hint as usize).saturating_add(64);
+        let mut pids = vec![0i32; capacity];
+        let buf_bytes = (pids.len() * std::mem::size_of::<i32>()) as c_int;
+        let num_pids = proc_listallpids(pids.as_mut_ptr() as *mut c_void, buf_bytes);
+        if num_pids <= 0 {
+            return false;
+        }
+        let limit = (num_pids as usize).min(pids.len());
+        let mut path_buf = [0u8; PROC_PIDPATHINFO_MAXSIZE];
+        for &pid in &pids[..limit] {
+            if pid <= 0 {
+                continue;
+            }
+            let len = proc_pidpath(
+                pid,
+                path_buf.as_mut_ptr() as *mut c_void,
+                PROC_PIDPATHINFO_MAXSIZE as u32,
+            );
+            if len > 0 {
+                let slice = &path_buf[..len as usize];
+                if let Ok(path) = std::str::from_utf8(slice) {
+                    if line_is_music_app(path) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
 }
 
 #[cfg(windows)]
 fn music_app_running() -> bool {
-    let Ok(output) = Command::new("tasklist")
-        .args(["/FO", "CSV", "/NH"])
-        .output()
-    else {
-        return false;
+    use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
+    use windows_sys::Win32::System::Diagnostics::ToolHelp::{
+        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+        TH32CS_SNAPPROCESS,
     };
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    stdout.lines().any(line_is_music_app)
+
+    // Native Win32 Toolhelp32 process enumeration: zero child processes spawned,
+    // completely eliminating the flashing CMD window and `tasklist.exe` CPU overhead.
+    unsafe {
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if snapshot.is_null() || snapshot == INVALID_HANDLE_VALUE {
+            return false;
+        }
+
+        let mut entry: PROCESSENTRY32W = std::mem::zeroed();
+        entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+
+        let mut found = false;
+        if Process32FirstW(snapshot, &mut entry) != 0 {
+            loop {
+                let len = entry
+                    .szExeFile
+                    .iter()
+                    .position(|&c| c == 0)
+                    .unwrap_or(entry.szExeFile.len());
+                let exe_name = String::from_utf16_lossy(&entry.szExeFile[..len]);
+                if line_is_music_app(&exe_name) {
+                    found = true;
+                    break;
+                }
+                if Process32NextW(snapshot, &mut entry) == 0 {
+                    break;
+                }
+            }
+        }
+
+        let _ = CloseHandle(snapshot);
+        found
+    }
 }
 
 #[cfg(target_os = "linux")]
@@ -160,10 +224,18 @@ pub fn is_music_playing() -> bool {
 
 pub fn start_media_watcher(app: AppHandle) {
     thread::spawn(move || {
-        // Emit the current state on every poll: the webview may attach its listener
-        // after the first scan, and `setMusicPlaying` is idempotent on the frontend.
+        // Wait briefly so the webview listener is attached before initial emit,
+        // then only emit when state changes (plus one redundant sync after startup).
+        thread::sleep(Duration::from_secs(2));
+        let mut last_state: Option<bool> = None;
+        let mut initial_syncs_left: u8 = 2;
         loop {
-            let _ = app.emit("kuro-media", is_music_playing());
+            let playing = is_music_playing();
+            if last_state != Some(playing) || initial_syncs_left > 0 {
+                last_state = Some(playing);
+                initial_syncs_left = initial_syncs_left.saturating_sub(1);
+                let _ = app.emit("kuro-media", playing);
+            }
             thread::sleep(POLL_INTERVAL);
         }
     });
@@ -212,5 +284,10 @@ mod tests {
         assert!(!line_is_music_app("WeChatAppEx"));
         assert!(!line_is_music_app("\"chrome.exe\",\"1\",\"Console\",\"1\",\"1 K\""));
         assert!(!line_is_music_app(""));
+    }
+
+    #[test]
+    fn native_process_scan_runs_cleanly() {
+        let _ = is_music_playing();
     }
 }

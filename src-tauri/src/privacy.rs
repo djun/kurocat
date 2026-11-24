@@ -17,12 +17,19 @@ pub fn start_password_privacy_watcher(
     std::thread::spawn(move || {
         #[cfg(windows)]
         let uia = win_impl::UiaDetector::new();
+        #[cfg(target_os = "macos")]
+        let ax = mac_impl::AxDetector::new();
 
         let mut active = false;
         let mut clear_streak: u8 = 0;
 
         loop {
-            std::thread::sleep(Duration::from_millis(140));
+            let sleep_ms = if active || input_hook::ms_since_last_input() < 3_000 {
+                220
+            } else {
+                800
+            };
+            std::thread::sleep(Duration::from_millis(sleep_ms));
 
             let guard_enabled = !paused_guard.load(Ordering::Relaxed)
                 && settings
@@ -43,7 +50,7 @@ pub fn start_password_privacy_watcher(
             #[cfg(windows)]
             let is_pwd = win_impl::is_focused_password_field(uia.as_ref());
             #[cfg(target_os = "macos")]
-            let is_pwd = mac_impl::is_focused_password_field();
+            let is_pwd = mac_impl::is_focused_password_field(ax.as_ref());
             #[cfg(all(not(windows), not(target_os = "macos")))]
             let is_pwd = false;
 
@@ -254,28 +261,58 @@ mod mac_impl {
         )
     }
 
-    unsafe fn ax_focused_is_secure_text_field() -> bool {
-        if !AXIsProcessTrusted() {
-            return false;
-        }
-        let sys_wide = AXUIElementCreateSystemWide();
-        if sys_wide.is_null() {
-            return false;
-        }
-        let attr_focused = make_cf_string("AXFocusedUIElement");
-        let attr_subrole = make_cf_string("AXSubrole");
-        let secure_subrole = make_cf_string("AXSecureTextField");
+    pub struct AxDetector {
+        sys_wide: *mut c_void,
+        attr_focused: *mut c_void,
+        attr_subrole: *mut c_void,
+        secure_subrole: *mut c_void,
+    }
 
-        let mut is_secure = false;
-        if !attr_focused.is_null() && !attr_subrole.is_null() && !secure_subrole.is_null() {
+    impl AxDetector {
+        pub fn new() -> Option<Self> {
+            unsafe {
+                let sys_wide = AXUIElementCreateSystemWide();
+                if sys_wide.is_null() {
+                    return None;
+                }
+                let attr_focused = make_cf_string("AXFocusedUIElement");
+                let attr_subrole = make_cf_string("AXSubrole");
+                let secure_subrole = make_cf_string("AXSecureTextField");
+                if attr_focused.is_null() || attr_subrole.is_null() || secure_subrole.is_null() {
+                    if !secure_subrole.is_null() {
+                        CFRelease(secure_subrole);
+                    }
+                    if !attr_subrole.is_null() {
+                        CFRelease(attr_subrole);
+                    }
+                    if !attr_focused.is_null() {
+                        CFRelease(attr_focused);
+                    }
+                    CFRelease(sys_wide);
+                    return None;
+                }
+                Some(Self {
+                    sys_wide,
+                    attr_focused,
+                    attr_subrole,
+                    secure_subrole,
+                })
+            }
+        }
+
+        unsafe fn focused_is_secure_text_field(&self) -> bool {
+            if !AXIsProcessTrusted() {
+                return false;
+            }
+            let mut is_secure = false;
             let mut focused: *mut c_void = std::ptr::null_mut();
-            let err1 = AXUIElementCopyAttributeValue(sys_wide, attr_focused, &mut focused);
+            let err1 = AXUIElementCopyAttributeValue(self.sys_wide, self.attr_focused, &mut focused);
             if err1 == 0 && !focused.is_null() {
                 let mut subrole: *mut c_void = std::ptr::null_mut();
-                let err2 = AXUIElementCopyAttributeValue(focused, attr_subrole, &mut subrole);
+                let err2 = AXUIElementCopyAttributeValue(focused, self.attr_subrole, &mut subrole);
                 if err2 == 0 && !subrole.is_null() {
                     if CFGetTypeID(subrole) == CFStringGetTypeID()
-                        && CFEqual(subrole, secure_subrole) != 0
+                        && CFEqual(subrole, self.secure_subrole) != 0
                     {
                         is_secure = true;
                     }
@@ -283,27 +320,30 @@ mod mac_impl {
                 }
                 CFRelease(focused);
             }
+            is_secure
         }
-
-        if !secure_subrole.is_null() {
-            CFRelease(secure_subrole);
-        }
-        if !attr_subrole.is_null() {
-            CFRelease(attr_subrole);
-        }
-        if !attr_focused.is_null() {
-            CFRelease(attr_focused);
-        }
-        CFRelease(sys_wide);
-        is_secure
     }
 
-    pub fn is_focused_password_field() -> bool {
+    impl Drop for AxDetector {
+        fn drop(&mut self) {
+            unsafe {
+                CFRelease(self.secure_subrole);
+                CFRelease(self.attr_subrole);
+                CFRelease(self.attr_focused);
+                CFRelease(self.sys_wide);
+            }
+        }
+    }
+
+    pub fn is_focused_password_field(ax: Option<&AxDetector>) -> bool {
         unsafe {
             if IsSecureEventInputEnabled() != 0 {
                 return true;
             }
-            ax_focused_is_secure_text_field()
+            if let Some(det) = ax {
+                return det.focused_is_secure_text_field();
+            }
+            false
         }
     }
 }

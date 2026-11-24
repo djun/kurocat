@@ -381,6 +381,10 @@ export class KuroCatEngine {
   private keyAnims = new Map<string, KeyAnim>();
   private bubbles: KeyBubble[] = [];
   private nextBubbleId = 1;
+  private kbCacheCanvas: HTMLCanvasElement | null = null;
+  private kbCacheKey = '';
+  private kbCacheLogW = 0;
+  private kbCacheLogH = 0;
 
   constructor(canvas: HTMLCanvasElement, options?: { embedded?: boolean }) {
     this.canvas = canvas;
@@ -442,17 +446,47 @@ export class KuroCatEngine {
     this.canvas.height = Math.round(cssH * dpr);
   }
 
+  private isRenderActive(now: number): boolean {
+    return (
+      now - this.lastAnyKeyAt < 1800 ||
+      now - this.lastMouseMoveAt < 1200 ||
+      now - this.privacyTypingAt < 1500 ||
+      this.cursorOverCat ||
+      this.isBlinking ||
+      this.bubbles.length > 0 ||
+      this.mouseBadges.length > 0 ||
+      this.typingSparks.length > 0 ||
+      this.typingEnergy > 0.04 ||
+      this.petEnergy > 0.04 ||
+      this.leftPaw.mode !== 'idle' ||
+      this.rightPaw.mode !== 'idle' ||
+      this.leftPaw.smears.length > 0 ||
+      this.rightPaw.smears.length > 0
+    );
+  }
+
   public start(): void {
     this.lastTime = performance.now();
     const tick = (now: number) => {
-      const dt = Math.min(0.05, Math.max(0.001, (now - this.lastTime) / 1000));
+      this.rafId = requestAnimationFrame(tick);
+      if (document.hidden) {
+        this.lastTime = now;
+        return;
+      }
+      // Adaptive FPS cap: ~60fps when actively typing/moving/animating (prevents 120/144/240Hz
+      // oversampling CPU/GPU burn), and ~20fps during calm idle breathing.
+      const minFrameMs = this.isRenderActive(now) ? 15.5 : 48;
+      const elapsedMs = now - this.lastTime;
+      if (elapsedMs < minFrameMs) {
+        return;
+      }
+      const dt = Math.min(0.08, Math.max(0.001, elapsedMs / 1000));
       this.lastTime = now;
       this.update(dt, now);
       this.render();
       if (this.onAfterRender) {
         this.onAfterRender();
       }
-      this.rafId = requestAnimationFrame(tick);
     };
     this.rafId = requestAnimationFrame(tick);
   }
@@ -2342,6 +2376,137 @@ export class KuroCatEngine {
     ctx.restore();
   }
 
+  private ensureKeyboardCache(): HTMLCanvasElement | null {
+    const cacheKey = `${this.keyboardLayout}:${this.keyboardOrientation}:${this.kbWidth}x${this.kbHeight}`;
+    if (this.kbCacheCanvas && this.kbCacheKey === cacheKey) {
+      return this.kbCacheCanvas;
+    }
+
+    const layout = getKeyboardLayout(this.keyboardLayout);
+    const isCatFacing = this.keyboardOrientation === 'cat';
+    const is108 = this.keyboardLayout === '108';
+    const padX = 7;
+    const padY = 6;
+    const innerW = this.kbWidth - padX * 2;
+    const innerH = this.kbHeight - padY * 2;
+    const topHalfW = (this.kbWidth * 0.955) / 2;
+    const botHalfW = (this.kbWidth * 1.035) / 2;
+    const halfH = this.kbHeight / 2;
+
+    const margin = 24;
+    const logW = Math.ceil(botHalfW * 2) + margin * 2;
+    const logH = Math.ceil(this.kbHeight) + margin * 2;
+    const supersample = 2.5;
+
+    const offscreen = this.kbCacheCanvas ?? document.createElement('canvas');
+    offscreen.width = Math.ceil(logW * supersample);
+    offscreen.height = Math.ceil(logH * supersample);
+    const octx = offscreen.getContext('2d');
+    if (!octx) return null;
+
+    octx.clearRect(0, 0, offscreen.width, offscreen.height);
+    octx.save();
+    octx.scale(supersample, supersample);
+    octx.translate(logW / 2, logH / 2);
+
+    // Base shadow (baked once instead of shadowBlur=11 every frame!)
+    octx.save();
+    octx.shadowColor = 'rgba(0, 0, 0, 0.34)';
+    octx.shadowBlur = 11;
+    octx.shadowOffsetY = 5;
+    octx.fillStyle = '#191a1e';
+    this.trapezoidPath(octx, topHalfW, botHalfW, -halfH + 3.5, halfH + 5.5, 6.5);
+    octx.fill();
+    octx.restore();
+
+    octx.fillStyle = '#24262c';
+    octx.strokeStyle = '#363840';
+    octx.lineWidth = 1.1;
+    this.trapezoidPath(octx, topHalfW, botHalfW, -halfH, halfH, 6.5);
+    octx.fill();
+    octx.stroke();
+
+    // Bright clean light-grey inner keybed matching ORIG 0.3s bright airy white keyboard!
+    octx.fillStyle = '#d4d6d1';
+    this.trapezoidPath(octx, topHalfW - 5, botHalfW - 5, -halfH + 4, halfH - 4, 3.5);
+    octx.fill();
+
+    const rowH = innerH / layout.totalRows;
+    const unitW = innerW / layout.totalUnits;
+    const gap = is108 ? 0.85 : 0.9;
+
+    for (const key of layout.keys) {
+      const rY = key.rowY ?? key.row;
+      const rSpan = key.rowSpan ?? 1;
+      const screenRowTop = isCatFacing ? layout.totalRows - (rY + rSpan) : rY;
+      const screenUStart = isCatFacing
+        ? layout.totalUnits - (key.uStart + key.uWidth)
+        : key.uStart;
+
+      const rowCenterFrac = (screenRowTop + rSpan * 0.5) / layout.totalRows;
+      const depthScale = 0.94 + rowCenterFrac * 0.09;
+
+      const rawX = -innerW / 2 + screenUStart * unitW + gap * 0.5;
+      const rawW = key.uWidth * unitW - gap;
+      const x = rawX * depthScale;
+      const w = rawW * depthScale;
+      const y = -innerH / 2 + screenRowTop * rowH + gap * 0.5;
+      const h = rSpan * rowH - gap - 0.8;
+
+      let topColor = '#f8f8f5';
+      let sideColor = '#d0d2cc';
+      if (key.accent === 'orange') {
+        topColor = '#f4a524';
+        sideColor = '#c27a10';
+      } else if (key.accent === 'mod') {
+        topColor = '#efefeb';
+        sideColor = '#c7c9c3';
+      }
+
+      octx.fillStyle = sideColor;
+      this.roundRect(octx, x, y + 1.4, w, h, 1.8);
+      octx.fill();
+
+      octx.fillStyle = topColor;
+      this.roundRect(octx, x, y, w, h - 0.9, 1.8);
+      octx.fill();
+
+      const legend = key.id === 'space' ? '' : key.id === 'esc' ? 'Esc' : key.label;
+      if (legend) {
+        const isWideWord = legend.length >= 3;
+        const fontSize = is108
+          ? isWideWord
+            ? 5.0
+            : legend.length === 2
+              ? 5.8
+              : 7.2
+          : isWideWord
+            ? 5.6
+            : legend.length === 2
+              ? 6.4
+              : 7.8;
+        octx.save();
+        octx.translate(x + w * 0.5, y + (h - 0.9) * 0.50);
+        if (isCatFacing) {
+          octx.rotate(Math.PI);
+        }
+        octx.font = `700 ${fontSize}px "Segoe UI", system-ui, sans-serif`;
+        octx.fillStyle = key.accent === 'orange' ? '#ffffff' : '#2c2f36';
+        octx.textAlign = 'center';
+        octx.textBaseline = 'middle';
+        octx.fillText(legend, 0, 0);
+        octx.restore();
+      }
+    }
+
+    octx.restore();
+    this.kbCacheCanvas = offscreen;
+    this.kbCacheKey = cacheKey;
+    this.kbCacheLogW = logW;
+    this.kbCacheLogH = logH;
+    return offscreen;
+  }
+
   private drawKeyboard(ctx: CanvasRenderingContext2D): void {
     const layout = getKeyboardLayout(this.keyboardLayout);
     const isCatFacing = this.keyboardOrientation === 'cat';
@@ -2361,34 +2526,28 @@ export class KuroCatEngine {
     const botHalfW = (this.kbWidth * 1.035) / 2;
     const halfH = this.kbHeight / 2;
 
-    ctx.save();
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.34)';
-    ctx.shadowBlur = 11;
-    ctx.shadowOffsetY = 5;
-    ctx.fillStyle = '#191a1e';
-    this.trapezoidPath(ctx, topHalfW, botHalfW, -halfH + 3.5, halfH + 5.5, 6.5);
-    ctx.fill();
-    ctx.restore();
-
-    ctx.fillStyle = '#24262c';
-    ctx.strokeStyle = '#363840';
-    ctx.lineWidth = 1.1;
-    this.trapezoidPath(ctx, topHalfW, botHalfW, -halfH, halfH, 6.5);
-    ctx.fill();
-    ctx.stroke();
-
-    // Bright clean light-grey inner keybed matching ORIG 0.3s bright airy white keyboard!
-    ctx.fillStyle = '#d4d6d1';
-    this.trapezoidPath(ctx, topHalfW - 5, botHalfW - 5, -halfH + 4, halfH - 4, 3.5);
-    ctx.fill();
+    const cached = this.ensureKeyboardCache();
+    if (cached) {
+      ctx.drawImage(
+        cached,
+        -this.kbCacheLogW / 2,
+        -this.kbCacheLogH / 2,
+        this.kbCacheLogW,
+        this.kbCacheLogH,
+      );
+    }
 
     const rowH = innerH / layout.totalRows;
     const unitW = innerW / layout.totalUnits;
     const gap = is108 ? 0.85 : 0.9;
 
+    // Only redraw actively pressed/animating keys over the cached base keyboard!
     for (const key of layout.keys) {
       const anim = this.keyAnims.get(key.id);
       const press = anim ? anim.pressAmount : 0;
+      if (cached && press <= 0.01) {
+        continue;
+      }
 
       const rY = key.rowY ?? key.row;
       const rSpan = key.rowSpan ?? 1;
@@ -2404,8 +2563,15 @@ export class KuroCatEngine {
       const rawW = key.uWidth * unitW - gap;
       const x = rawX * depthScale;
       const w = rawW * depthScale;
-      const y = -innerH / 2 + screenRowTop * rowH + gap * 0.5 + press * 2.0;
+      const baseY = -innerH / 2 + screenRowTop * rowH + gap * 0.5;
+      const y = baseY + press * 2.0;
       const h = rSpan * rowH - gap - 0.8;
+
+      // Clear the unpressed keycap top strip behind the depressed key so it looks cleanly sunken
+      if (cached && press > 0.01) {
+        ctx.fillStyle = '#d4d6d1';
+        ctx.fillRect(x - 0.3, baseY - 0.3, w + 0.6, h + 2.0);
+      }
 
       let topColor = '#f8f8f5';
       let sideColor = '#d0d2cc';

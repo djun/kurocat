@@ -67,9 +67,26 @@ enum RawHookMsg {
 
 static HOOK_TX: OnceLock<mpsc::Sender<RawHookMsg>> = OnceLock::new();
 static KEY_EVENTS_RECEIVED: AtomicU64 = AtomicU64::new(0);
+static START_INSTANT: OnceLock<Instant> = OnceLock::new();
+static LAST_INPUT_MS: AtomicU64 = AtomicU64::new(0);
 static ALT_HELD: AtomicBool = AtomicBool::new(false);
 static HOOKS_PAUSED: AtomicBool = AtomicBool::new(false);
 static PASSWORD_PRIVACY_ACTIVE: AtomicBool = AtomicBool::new(false);
+
+fn now_mono_ms() -> u64 {
+    START_INSTANT
+        .get_or_init(Instant::now)
+        .elapsed()
+        .as_millis() as u64
+}
+
+pub fn ms_since_last_input() -> u64 {
+    let last = LAST_INPUT_MS.load(Ordering::Relaxed);
+    if last == 0 {
+        return u64::MAX;
+    }
+    now_mono_ms().saturating_sub(last)
+}
 
 pub fn set_password_privacy_active(active: bool) {
     PASSWORD_PRIVACY_ACTIVE.store(active, Ordering::SeqCst);
@@ -358,6 +375,7 @@ pub fn start_global_hooks(app: AppHandle) {
             }
             match msg {
                 RawHookMsg::KeyDown { vk, scan, source } => {
+                    LAST_INPUT_MS.store(now_mono_ms(), Ordering::Relaxed);
                     if is_alt_vk(vk) {
                         ALT_HELD.store(true, Ordering::Relaxed);
                     }
@@ -390,6 +408,7 @@ pub fn start_global_hooks(app: AppHandle) {
                     }
                 }
                 RawHookMsg::MouseDown(btn) => {
+                    LAST_INPUT_MS.store(now_mono_ms(), Ordering::Relaxed);
                     let _ = app.emit(
                         "kuro-input",
                         InputEvent::MouseDown {
@@ -406,6 +425,7 @@ pub fn start_global_hooks(app: AppHandle) {
                     );
                 }
                 RawHookMsg::MouseWheel(delta) => {
+                    LAST_INPUT_MS.store(now_mono_ms(), Ordering::Relaxed);
                     let _ = app.emit("kuro-input", InputEvent::MouseWheel { delta });
                 }
                 RawHookMsg::MouseMove { x, y } => {
