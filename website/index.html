@@ -86,21 +86,21 @@
         </p>
 
         <div class="hero-actions hero-downloads">
-          <a class="btn-lime" id="hero-win-dl" href="https://github.com/xpfyg/kurocat/releases/latest/download/KuroCat-x64-setup.exe" target="_blank" rel="noopener">
+          <button class="btn-lime btn-pan" id="pan-dl-btn" type="button" data-pan-open aria-haspopup="dialog">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 12.5h7a3 3 0 0 0 .3-6 4.5 4.5 0 0 0-8.6-1.1A3.6 3.6 0 0 0 4.5 12.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+            夸克网盘下载（推荐）
+          </button>
+          <a class="btn-outline" id="hero-win-dl" href="https://github.com/xpfyg/kurocat/releases/latest/download/KuroCat-x64-setup.exe" target="_blank" rel="noopener">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2.2v7.6m0 0L4.8 6.6M8 9.8l3.2-3.2M2.5 12.8h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span id="hero-win-dl-label">下载 Windows 版</span>
+            <span id="hero-win-dl-label">GitHub · Windows 版</span>
           </a>
           <a class="btn-outline hero-mac-btn" id="hero-mac-dl" href="https://github.com/xpfyg/kurocat/releases/latest/download/KuroCat-macos-universal.dmg" target="_blank" rel="noopener">
-            <span id="hero-mac-dl-label">下载 macOS 版</span>
+            <span id="hero-mac-dl-label">GitHub · macOS 版</span>
           </a>
           <a class="btn-ghost" href="https://github.com/xpfyg/kurocat" target="_blank" rel="noopener">GitHub 源码 →</a>
-          <button class="btn-outline btn-pan" id="pan-dl-btn" type="button" aria-haspopup="dialog">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 12.5h7a3 3 0 0 0 .3-6 4.5 4.5 0 0 0-8.6-1.1A3.6 3.6 0 0 0 4.5 12.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
-            网盘下载
-          </button>
         </div>
 
-        <p class="pan-hint">GitHub 直连对网络要求较高，若下载链接不稳定或速度太慢，可改用<strong>夸克网盘</strong>获取安装包。
+        <p class="pan-hint"><strong>优先推荐网盘：</strong>GitHub 直连对网络要求较高，若出现下载链接不稳定、速度过慢或无法打开，请直接使用<strong>夸克网盘</strong>，扫码或复制分享文案即可获取安装包。</p>
 
         <div class="hero-specs">
           <div class="hero-spec-item">
@@ -208,6 +208,17 @@
           安装包由 GitHub Actions 编译并发布，下载按钮直接前往当前仓库的官方 Release 附件。
           两个平台均支持 <strong>20%–150% 无级缩放</strong>、<strong>65% / 108 键切换</strong> 与 <strong>App 内自动更新</strong>。
         </p>
+      </div>
+
+      <div class="pan-banner">
+        <div class="pan-banner-left">
+          <span class="pan-banner-badge">推荐通道</span>
+          <div>
+            <div class="pan-banner-title">夸克网盘下载 · 网络不佳时的首选</div>
+            <p class="pan-banner-desc">GitHub 直连对网络要求较高，若出现链接不稳定、下载过慢或无法打开，请优先通过夸克网盘获取安装包，支持扫码与一键复制分享文案。</p>
+          </div>
+        </div>
+        <button class="btn-lime" type="button" data-pan-open aria-haspopup="dialog">打开夸克网盘下载 →</button>
       </div>
 
       <div class="download-grid">

@@ -1883,21 +1883,85 @@ footer {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: var(--moss);
+  background: var(--accent);
   color: var(--paper-2);
   border-color: var(--ink);
 }
 
 .pan-hint {
-  margin-top: 14px;
-  max-width: 56ch;
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--ink-3);
+  margin-top: 16px;
+  max-width: 64ch;
+  padding: 12px 14px;
+  background: var(--accent-soft);
+  border-left: 4px solid var(--accent);
+  border-radius: 2px;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--ink-2);
 }
 
 .pan-hint strong {
-  color: var(--moss);
+  color: var(--accent);
+}
+
+.pan-banner {
+  margin: 26px 0 26px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  background: var(--accent-soft);
+  border: var(--line);
+  border-left: 6px solid var(--accent);
+  border-radius: 2px;
+  box-shadow: 6px 6px 0 var(--ink);
+  padding: 18px 20px;
+}
+
+.pan-banner-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.pan-banner-badge {
+  flex-shrink: 0;
+  background: var(--accent);
+  color: var(--paper-2);
+  border: 1.5px solid var(--ink);
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.pan-banner-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  color: var(--ink);
+}
+
+.pan-banner-desc {
+  margin-top: 6px;
+  max-width: 64ch;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--ink-2);
+}
+
+@media (max-width: 640px) {
+  .pan-banner {
+    align-items: stretch;
+  }
+
+  .pan-banner .btn-lime {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 .pan-modal {

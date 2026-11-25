@@ -707,10 +707,12 @@ function initMcpCodeTabs(): void {
 }
 
 function initPanModal(): void {
-  const openBtn = document.getElementById('pan-dl-btn');
   const modal = document.getElementById('pan-modal');
   const copyBtn = document.getElementById('pan-copy-btn');
-  if (!openBtn || !modal) return;
+  const openers = Array.from(document.querySelectorAll<HTMLElement>('[data-pan-open]'));
+  if (!modal || openers.length === 0) return;
+
+  let lastTrigger: HTMLElement | null = null;
 
   const shareText =
     '我用夸克网盘给你分享了「小猫键盘」，点击链接或复制整段内容，打开「夸克APP」即可获取。\n链接：https://pan.quark.cn/s/d0c3ab148872';
@@ -718,13 +720,16 @@ function initPanModal(): void {
   const close = () => {
     modal.hidden = true;
     document.body.style.overflow = '';
-    openBtn.focus();
+    lastTrigger?.focus();
   };
 
-  openBtn.addEventListener('click', () => {
-    modal.hidden = false;
-    document.body.style.overflow = 'hidden';
-    modal.querySelector<HTMLButtonElement>('[data-pan-close]')?.focus();
+  openers.forEach((trigger) => {
+    trigger.addEventListener('click', () => {
+      lastTrigger = trigger;
+      modal.hidden = false;
+      document.body.style.overflow = 'hidden';
+      modal.querySelector<HTMLButtonElement>('[data-pan-close]')?.focus();
+    });
   });
 
   modal.querySelectorAll('[data-pan-close]').forEach((el) => {
