@@ -68,6 +68,7 @@ jobs:
             throw 'Windows NSIS installer was not generated'
           }
           Copy-Item $nsis.FullName "KuroCat-$ver-x64-setup.exe"
+          Copy-Item $nsis.FullName "KuroCat-x64-setup.exe"
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -76,6 +77,7 @@ jobs:
           if-no-files-found: error
           path: |
             KuroCat-*-x64-setup.exe
+            KuroCat-x64-setup.exe
 
       - name: Publish Windows assets to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
@@ -85,6 +87,7 @@ jobs:
           draft: false
           files: |
             KuroCat-*-x64-setup.exe
+            KuroCat-x64-setup.exe
 
   build-macos:
     if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.linux_only) }}
@@ -223,6 +226,16 @@ jobs:
           codesign --verify --verbose=2 "$DMG_PATH"
           spctl -a -t open --context context:primary-signature -vv "$DMG_PATH" || true
 
+      - name: Create stable download aliases
+        run: |
+          DMG_PATH="$(ls KuroCat-*-macos-universal.dmg | head -n 1)"
+          TARBALL_PATH="$(ls KuroCat-*-macos-universal.app.tar.gz | head -n 1)"
+          test -f "$DMG_PATH"
+          test -f "$TARBALL_PATH"
+          cp "$DMG_PATH" KuroCat-macos-universal.dmg
+          cp "$TARBALL_PATH" KuroCat-macos-universal.app.tar.gz
+          ls -lh KuroCat-macos-universal.dmg KuroCat-macos-universal.app.tar.gz
+
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -231,6 +244,8 @@ jobs:
           path: |
             KuroCat-*-macos-universal.dmg
             KuroCat-*-macos-universal.app.tar.gz
+            KuroCat-macos-universal.dmg
+            KuroCat-macos-universal.app.tar.gz
 
       - name: Publish macOS assets to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
@@ -241,6 +256,8 @@ jobs:
           files: |
             KuroCat-*-macos-universal.dmg
             KuroCat-*-macos-universal.app.tar.gz
+            KuroCat-macos-universal.dmg
+            KuroCat-macos-universal.app.tar.gz
 
   build-linux:
     if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.macos_only) }}
@@ -333,11 +350,13 @@ jobs:
           ARCH="${{ matrix.arch }}"
           DEB=$(ls src-tauri/target/release/bundle/deb/*.deb | head -n 1)
           cp "$DEB" "KuroCat-${TAG}-linux-${ARCH}.deb"
+          cp "$DEB" "KuroCat-linux-${ARCH}.deb"
           APPIMG=$(ls src-tauri/target/release/bundle/appimage/*.AppImage 2>/dev/null | head -n 1 || true)
           if [[ -n "$APPIMG" && -f "$APPIMG" ]]; then
             cp "$APPIMG" "KuroCat-${TAG}-linux-${ARCH}.AppImage"
+            cp "$APPIMG" "KuroCat-linux-${ARCH}.AppImage"
           fi
-          ls -lh KuroCat-${TAG}-linux-${ARCH}.*
+          ls -lh KuroCat-${TAG}-linux-${ARCH}.* KuroCat-linux-${ARCH}.*
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
@@ -346,6 +365,8 @@ jobs:
           path: |
             KuroCat-*-linux-${{ matrix.arch }}.deb
             KuroCat-*-linux-${{ matrix.arch }}.AppImage
+            KuroCat-linux-${{ matrix.arch }}.deb
+            KuroCat-linux-${{ matrix.arch }}.AppImage
 
       - name: Publish Linux assets to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
@@ -356,3 +377,5 @@ jobs:
           files: |
             KuroCat-*-linux-${{ matrix.arch }}.deb
             KuroCat-*-linux-${{ matrix.arch }}.AppImage
+            KuroCat-linux-${{ matrix.arch }}.deb
+            KuroCat-linux-${{ matrix.arch }}.AppImage
