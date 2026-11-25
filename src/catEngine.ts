@@ -153,6 +153,8 @@ export class KuroCatEngine {
   private workTypingSec = 0;
   private relaxAmount = 0;
   private annoyAmount = 0;
+  private headphoneAmount = 0;
+  private tailWagPhase = 0;
   private happyAmount = 0;
   private curiousAmount = 0;
   private sleepyAmount = 0;
@@ -166,6 +168,9 @@ export class KuroCatEngine {
   private nextMoodGlyphAt = 0;
 
   public setMusicPlaying(active: boolean): void {
+    if (active && !this.musicPlaying) {
+      this.workTypingSec = 0;
+    }
     this.musicPlaying = active;
   }
 
@@ -368,6 +373,7 @@ export class KuroCatEngine {
   private squintAmount = 0;
   private earTwitchLeft = 0;
   private earTwitchRight = 0;
+  private nextEarFlickAt = 1.8;
   private recentKeyTimes: number[] = [];
   private typingEnergy = 0;
   private lastAnyKeyAt = -10000;
@@ -458,6 +464,12 @@ export class KuroCatEngine {
       this.typingSparks.length > 0 ||
       this.typingEnergy > 0.04 ||
       this.petEnergy > 0.04 ||
+      this.annoyAmount > 0.04 ||
+      this.relaxAmount > 0.04 ||
+      this.earTwitchLeft > 0.01 ||
+      this.earTwitchRight > 0.01 ||
+      (this.headphoneAmount > 0.01 && this.headphoneAmount < 0.99) ||
+      this.musicNotes.length > 0 ||
       this.leftPaw.mode !== 'idle' ||
       this.rightPaw.mode !== 'idle' ||
       this.leftPaw.smears.length > 0 ||
@@ -578,9 +590,9 @@ export class KuroCatEngine {
       return;
     }
 
-    if (Math.random() < 0.16) {
-      if (Math.random() < 0.5) this.earTwitchLeft = 1;
-      else this.earTwitchRight = 1;
+    if (Math.random() < 0.24) {
+      if (Math.random() < 0.5) this.earTwitchLeft = Math.max(this.earTwitchLeft, 0.85);
+      else this.earTwitchRight = Math.max(this.earTwitchRight, 0.85);
     }
 
     const layout = getKeyboardLayout(this.keyboardLayout);
@@ -1171,6 +1183,230 @@ export class KuroCatEngine {
     ctx.restore();
   }
 
+  private getEarPose(sideSign: -1 | 1): {
+    x: number;
+    y: number;
+    rot: number;
+    scaleX: number;
+    scaleY: number;
+    tipBend: number;
+  } {
+    const rawTwitch = sideSign === -1 ? this.earTwitchLeft : this.earTwitchRight;
+    // Snappy organic feline ear flick (fast whip with a subtle secondary flutter)
+    const flick =
+      rawTwitch > 0.001
+        ? Math.sin(rawTwitch * Math.PI) * (1 + 0.34 * Math.sin(rawTwitch * Math.PI * 2.5))
+        : 0;
+
+    // Headphones press the ears down and fold them cleanly outward under the headband!
+    const hp = this.headphoneAmount;
+    const hpEase = 1 - Math.pow(1 - hp, 2.5);
+    const freeFactor = 1 - hpEase * 0.85;
+
+    // Subtle radar-ear tracking toward the cursor (the ear on the cursor's side perks slightly)
+    const lookBias = Math.max(-1, Math.min(1, this.eyeLookX / 6.5));
+    const radarPerk = Math.max(0, lookBias * sideSign) * freeFactor;
+
+    // Soft elastic secondary motion from typing bounce, head sway inertia, and gentle idle breathing
+    const idleFloat = Math.sin(this.elapsed * 1.9 + sideSign * 0.8) * 0.022 * freeFactor;
+    const swayInertia = Math.max(-0.14, Math.min(0.14, -this.typingSwayVel * 0.015)) * freeFactor;
+    const bobFlatten = this.bodyBob * 0.075 * freeFactor;
+    const petFold =
+      (this.squintAmount * 0.22 +
+        Math.sin(this.elapsed * 14 + sideSign) * 0.022 * this.squintAmount) *
+      freeFactor;
+    const annoyFold =
+      (this.annoyAmount * 0.42 +
+        Math.sin(this.elapsed * 26 + sideSign) * 0.024 * this.annoyAmount) *
+      freeFactor;
+    const sleepyDroop = this.sleepyAmount * 0.24 * freeFactor;
+    const curiousPerk = this.curiousAmount * 0.14 * freeFactor;
+
+    const x =
+      sideSign * (33 + hpEase * 5.2 + this.annoyAmount * 2.2 * freeFactor) +
+      this.faceTurnX * 0.18;
+    const y =
+      -28 +
+      hpEase * 12.8 +
+      this.annoyAmount * 6.0 * freeFactor +
+      this.sleepyAmount * 2.8 * freeFactor +
+      this.squintAmount * 2.2 * freeFactor -
+      this.curiousAmount * 3.2 * freeFactor -
+      radarPerk * 1.8 -
+      flick * 1.4 * freeFactor +
+      this.bodyBob * 1.2 * freeFactor;
+
+    const rot =
+      sideSign *
+        (0.08 +
+          hpEase * 0.58 +
+          flick * 0.24 * freeFactor +
+          annoyFold +
+          petFold +
+          sleepyDroop +
+          bobFlatten -
+          curiousPerk -
+          radarPerk * 0.08 +
+          idleFloat) +
+      swayInertia;
+
+    const scaleX = 1 + hpEase * 0.08 + this.bodyBob * 0.025 * freeFactor;
+    const scaleY =
+      1 -
+      hpEase * 0.36 +
+      this.curiousAmount * 0.07 * freeFactor +
+      radarPerk * 0.03 -
+      this.bodyBob * 0.045 * freeFactor -
+      this.annoyAmount * 0.06 * freeFactor;
+
+    // Flexible ear-tip bend so the tip itself curls/whips smoothly instead of rotating like a rigid triangle
+    const tipBend =
+      sideSign * (flick * 4.8 * freeFactor + hpEase * 3.8 + annoyFold * 3.0) +
+      swayInertia * 16;
+
+    return { x, y, rot, scaleX, scaleY, tipBend };
+  }
+
+  private drawHeadphones(
+    ctx: CanvasRenderingContext2D,
+    isDarkBase: boolean,
+    accentColor: string,
+  ): void {
+    const hp = this.headphoneAmount;
+    if (hp < 0.01) return;
+
+    const ease = 1 - Math.pow(1 - hp, 3);
+    const dropY = -(1 - ease) * 20;
+    const scale = 0.88 + 0.12 * ease;
+    const shiftX = this.faceTurnX * 0.28;
+    const beatPulse =
+      this.relaxAmount > 0.1
+        ? Math.pow(Math.max(0, Math.sin(this.elapsed * 4.4)), 4) * this.relaxAmount
+        : 0;
+
+    const bandOutline = isDarkBase ? '#0d0e12' : '#4a433e';
+    const bandMain = isDarkBase ? '#2e3340' : '#f4f1ea';
+    const bandHighlight = isDarkBase ? 'rgba(225, 232, 245, 0.42)' : 'rgba(255, 255, 255, 0.88)';
+    const cushionColor = isDarkBase ? '#414756' : '#6c635c';
+    const shellTop = isDarkBase ? '#3b4150' : '#fbf9f5';
+    const shellBot = isDarkBase ? '#1f232c' : '#d6d0c6';
+    const rimStroke = isDarkBase ? 'rgba(226, 234, 246, 0.55)' : '#4a433e';
+
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, hp * 1.45);
+    ctx.translate(shiftX, dropY);
+    ctx.scale(scale, scale);
+
+    // 1) Over-head arch band (sits cleanly over the crown while cute cat ear tips poke above!)
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(12, 14, 20, 0.28)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetY = 1.5;
+    ctx.strokeStyle = bandOutline;
+    ctx.lineWidth = 10.6;
+    ctx.beginPath();
+    ctx.moveTo(-55, -8);
+    ctx.bezierCurveTo(-52, -48, 52, -48, 55, -8);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.strokeStyle = bandMain;
+    ctx.lineWidth = 7.4;
+    ctx.beginPath();
+    ctx.moveTo(-55, -8);
+    ctx.bezierCurveTo(-52, -48, 52, -48, 55, -8);
+    ctx.stroke();
+
+    // Soft colored inner cushion pad at top center of headband
+    ctx.strokeStyle = accentColor;
+    ctx.lineWidth = 3.2;
+    ctx.beginPath();
+    ctx.moveTo(-21, -34.2);
+    ctx.quadraticCurveTo(0, -37.2, 21, -34.2);
+    ctx.stroke();
+
+    // Specular sheen along top crest of headband
+    ctx.strokeStyle = bandHighlight;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(-36, -32.2);
+    ctx.bezierCurveTo(-20, -41.5, 20, -41.5, 36, -32.2);
+    ctx.stroke();
+
+    // 2) Left & right plush over-ear studio cups
+    for (const side of [-1, 1] as const) {
+      const foreshorten = 1 + -side * Math.max(-0.14, Math.min(0.14, this.faceTurnX * 0.011));
+      ctx.save();
+      ctx.translate(side * 56, 1);
+      ctx.rotate(side * -0.08);
+      ctx.scale(foreshorten, 1);
+
+      // Metallic yoke hinge joining headband to cup
+      ctx.fillStyle = isDarkBase ? '#5a6275' : '#9c948b';
+      ctx.strokeStyle = bandOutline;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.roundRect(-3.2, -17.5, 6.4, 6.5, 2.2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Plush inner ear cushion hugging the cat's cheek
+      ctx.fillStyle = cushionColor;
+      ctx.strokeStyle = bandOutline;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.ellipse(side * -3.6, 0, 6.0, 15.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Outer rounded earcup housing with subtle 3D gradient
+      const shellGrad = ctx.createLinearGradient(0, -14, 0, 14);
+      shellGrad.addColorStop(0.0, shellTop);
+      shellGrad.addColorStop(1.0, shellBot);
+      ctx.save();
+      ctx.shadowColor = 'rgba(12, 14, 20, 0.30)';
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetY = 1.5;
+      ctx.fillStyle = shellGrad;
+      ctx.beginPath();
+      ctx.ellipse(side * 1.4, 0, 7.6, 14.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.strokeStyle = rimStroke;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(side * 1.4, 0, 7.6, 14.4, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Signature glowing accent ring / LED stripe on outer shell (pulses gently with music!)
+      ctx.save();
+      if (beatPulse > 0.05) {
+        ctx.shadowColor = accentColor;
+        ctx.shadowBlur = 6 + beatPulse * 7;
+      }
+      ctx.strokeStyle = accentColor;
+      ctx.lineWidth = 2.4 + beatPulse * 0.6;
+      ctx.beginPath();
+      ctx.ellipse(side * 3.0, 0, 3.0, 8.2, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+
+      // Crisp upper glossy highlight on outer shell
+      ctx.fillStyle = isDarkBase ? 'rgba(255, 255, 255, 0.24)' : 'rgba(255, 255, 255, 0.72)';
+      ctx.beginPath();
+      ctx.ellipse(side * 0.4, -7.2, 2.2, 4.2, side * -0.22, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
   // ---- Simulation update ----
 
   private update(dt: number, now: number): void {
@@ -1250,6 +1486,11 @@ export class KuroCatEngine {
 
     this.relaxAmount += (wantRelax - this.relaxAmount) * (1 - Math.exp(-1.6 * dt));
     this.annoyAmount += (wantAnnoy - this.annoyAmount) * (1 - Math.exp(-2.4 * dt));
+    const wantHeadphones = !moodBlocked && (preview ? preview === 'relaxed' : this.musicPlaying) ? 1 : 0;
+    this.headphoneAmount += (wantHeadphones - this.headphoneAmount) * (1 - Math.exp(-7.5 * dt));
+    if (this.annoyAmount > 0.01) {
+      this.tailWagPhase += dt * (6.8 + this.typingEnergy * 2.4 + this.annoyAmount * 1.4);
+    }
     this.happyAmount += (wantHappy - this.happyAmount) * (1 - Math.exp(-8 * dt));
     this.curiousAmount += (wantCurious - this.curiousAmount) * (1 - Math.exp(-5 * dt));
     this.sleepyAmount +=
@@ -1356,8 +1597,26 @@ export class KuroCatEngine {
       this.dafeiyu.update(dt, now, this.buildDaFeiYuLayout());
     }
 
-    this.earTwitchLeft = Math.max(0, this.earTwitchLeft - dt * 8);
-    this.earTwitchRight = Math.max(0, this.earTwitchRight - dt * 8);
+    this.earTwitchLeft = Math.max(0, this.earTwitchLeft - dt * 5.2);
+    this.earTwitchRight = Math.max(0, this.earTwitchRight - dt * 5.2);
+    if (
+      !this.privacyMode &&
+      this.headphoneAmount < 0.35 &&
+      this.sleepyAmount < 0.65 &&
+      this.elapsed >= this.nextEarFlickAt
+    ) {
+      const r = Math.random();
+      if (r < 0.45) {
+        this.earTwitchLeft = 1;
+      } else if (r < 0.9) {
+        this.earTwitchRight = 1;
+      } else {
+        // Occasional cute alternating double-ear perk
+        this.earTwitchLeft = 1;
+        this.earTwitchRight = 0.78;
+      }
+      this.nextEarFlickAt = this.elapsed + 2.0 + Math.random() * 2.8;
+    }
 
     if (!this.isBlinking && this.elapsed >= this.nextBlinkAt) {
       this.isBlinking = true;
@@ -1583,17 +1842,25 @@ export class KuroCatEngine {
 
   private drawTail(ctx: CanvasRenderingContext2D): void {
     // Exact ORIG 0.3s tail: leaves hip slightly higher, flat horizontal start curving cleanly up into a soft horizontal S-hook!
+    // When annoyed/impatient, cats lash their tail in a snappy traveling S-wave from base to tip.
     const gentleDrift = Math.sin(this.elapsed * 0.9) * 1.4;
+    const annoy = this.annoyAmount;
+    const lash = (p: number) => Math.tanh(Math.sin(p) * 1.55) / Math.tanh(1.55);
+    const w1 = annoy > 0.01 ? lash(this.tailWagPhase) * annoy : 0;
+    const w2 = annoy > 0.01 ? lash(this.tailWagPhase - 0.65) * annoy : 0;
+    const w3 = annoy > 0.01 ? lash(this.tailWagPhase - 1.25) * annoy : 0;
+
     const hipRight = this.spinePoint(0.84, 0);
 
     const startX = hipRight.x + 56;
     const startY = hipRight.y - 2;
-    const cp1X = startX + 34;
-    const cp1Y = startY + 4 + gentleDrift * 0.25;
-    const cp2X = startX + 38;
-    const cp2Y = startY - 34 + gentleDrift * 0.45;
-    const endX = startX + 70 + gentleDrift * 0.35;
-    const endY = startY - 35 + gentleDrift;
+    const cp1X = startX + 34 - annoy * 4 + w1 * 8;
+    const cp1Y = startY + 4 + gentleDrift * 0.25 + w1 * 18;
+    const cp2X = startX + 38 + w2 * 20;
+    const cp2Y = startY - 34 + gentleDrift * 0.45 - annoy * 10 + w2 * 34;
+    const endX = startX + 70 + gentleDrift * 0.35 - annoy * 6 + w3 * 26;
+    const endY = startY - 35 + gentleDrift - annoy * 14 + w3 * 44;
+    const tipAngle = Math.atan2(endY - cp2Y, endX - cp2X);
 
     ctx.save();
     ctx.lineCap = 'round';
@@ -1632,7 +1899,7 @@ export class KuroCatEngine {
       if (s.tailFluffy) {
         ctx.fillStyle = s.tailTipColor;
         ctx.beginPath();
-        ctx.ellipse(endX + 1, endY, 11.8, 10.2, -0.15, 0, Math.PI * 2);
+        ctx.ellipse(endX + 1, endY, 11.8, 10.2, tipAngle, 0, Math.PI * 2);
         ctx.fill();
       }
 
@@ -1704,7 +1971,7 @@ export class KuroCatEngine {
       // Bushy warm cocoa-taupe plume tip puff
       ctx.fillStyle = '#584b40';
       ctx.beginPath();
-      ctx.ellipse(endX + 1, endY, 12.2, 10.6, -0.15, 0, Math.PI * 2);
+      ctx.ellipse(endX + 1, endY, 12.2, 10.6, tipAngle, 0, Math.PI * 2);
       ctx.fill();
 
       // Soft warm creamy sheen along upper fluff curve
@@ -1964,22 +2231,19 @@ export class KuroCatEngine {
     ctx.translate(hcx, hcy);
     ctx.rotate(this.headTilt);
 
-    const lTwitch = Math.sin(this.earTwitchLeft * Math.PI) * 0.12;
-    const rTwitch = Math.sin(this.earTwitchRight * Math.PI) * 0.12;
-
-    const drawOneEar = (sideSign: -1 | 1, twitch: number) => {
+    const drawOneEar = (sideSign: -1 | 1) => {
+      const ear = this.getEarPose(sideSign);
       ctx.save();
-      ctx.translate(
-        sideSign * 33 + this.faceTurnX * 0.18,
-        -28 + this.annoyAmount * 4.5 - this.curiousAmount * 2.2,
-      );
-      ctx.rotate(sideSign * (0.08 + twitch + this.annoyAmount * 0.26));
+      ctx.translate(ear.x, ear.y);
+      ctx.rotate(ear.rot);
+      ctx.scale(ear.scaleX, ear.scaleY);
+      const tb = ear.tipBend;
 
       const earPath = () => {
         ctx.beginPath();
         ctx.moveTo(sideSign * 19, 20);
-        ctx.bezierCurveTo(sideSign * 19, -8, sideSign * 12, -23, sideSign * 3, -21);
-        ctx.bezierCurveTo(sideSign * -8, -18, sideSign * -16, -6, sideSign * -21, 8);
+        ctx.bezierCurveTo(sideSign * 19, -8, sideSign * 12 + tb * 0.5, -23, sideSign * 3 + tb, -21);
+        ctx.bezierCurveTo(sideSign * -8 + tb * 0.4, -18, sideSign * -16, -6, sideSign * -21, 8);
         ctx.closePath();
       };
 
@@ -2003,16 +2267,16 @@ export class KuroCatEngine {
         ctx.lineCap = 'round';
         ctx.beginPath();
         ctx.moveTo(sideSign * 19, 17);
-        ctx.bezierCurveTo(sideSign * 19, -8, sideSign * 12, -23, sideSign * 3, -21);
-        ctx.bezierCurveTo(sideSign * -8, -18, sideSign * -16, -6, sideSign * -19, 5);
+        ctx.bezierCurveTo(sideSign * 19, -8, sideSign * 12 + tb * 0.5, -23, sideSign * 3 + tb, -21);
+        ctx.bezierCurveTo(sideSign * -8 + tb * 0.4, -18, sideSign * -16, -6, sideSign * -19, 5);
         ctx.stroke();
 
         // Soft warm dusty-blush cream inner ear
         ctx.fillStyle = '#dec4be';
         ctx.beginPath();
         ctx.moveTo(sideSign * 11, 10);
-        ctx.bezierCurveTo(sideSign * 11, -3, sideSign * 7, -13, sideSign * 2, -11);
-        ctx.bezierCurveTo(sideSign * -4, -9, sideSign * -9, -1, sideSign * -10, 8);
+        ctx.bezierCurveTo(sideSign * 11, -3, sideSign * 7 + tb * 0.35, -13, sideSign * 2 + tb * 0.6, -11);
+        ctx.bezierCurveTo(sideSign * -4 + tb * 0.25, -9, sideSign * -9, -1, sideSign * -10, 8);
         ctx.closePath();
         ctx.fill();
 
@@ -2034,8 +2298,8 @@ export class KuroCatEngine {
       ctx.restore();
     };
 
-    drawOneEar(-1, lTwitch);
-    drawOneEar(1, rTwitch);
+    drawOneEar(-1);
+    drawOneEar(1);
 
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
@@ -2099,6 +2363,7 @@ export class KuroCatEngine {
     // 6) Expressive eyes (lemon-chartreuse for Black Cat / luminous sapphire-blue for Ragdoll!)
     this.drawEyes(ctx, wShift, -1);
     this.drawAngryBrows(ctx, wShift, isRagdoll ? 'rgba(56, 46, 40, 0.92)' : 'rgba(255, 226, 214, 0.92)');
+    this.drawHeadphones(ctx, !isRagdoll, isRagdoll ? '#7ac7ff' : '#d2f244');
 
     ctx.restore(); // end head
 
@@ -3476,22 +3741,19 @@ export class KuroCatEngine {
     ctx.translate(hcx, hcy);
     ctx.rotate(this.headTilt);
 
-    const lTwitch = Math.sin(this.earTwitchLeft * Math.PI) * 0.12;
-    const rTwitch = Math.sin(this.earTwitchRight * Math.PI) * 0.12;
-
-    const drawCustomEar = (sideSign: -1 | 1, twitch: number) => {
+    const drawCustomEar = (sideSign: -1 | 1) => {
+      const ear = this.getEarPose(sideSign);
       ctx.save();
-      ctx.translate(
-        sideSign * 33 + this.faceTurnX * 0.18,
-        -28 + this.annoyAmount * 4.5 - this.curiousAmount * 2.2,
-      );
-      ctx.rotate(sideSign * (0.08 + twitch + this.annoyAmount * 0.26));
+      ctx.translate(ear.x, ear.y);
+      ctx.rotate(ear.rot);
+      ctx.scale(ear.scaleX, ear.scaleY);
+      const tb = ear.tipBend;
 
       const earPath = () => {
         ctx.beginPath();
         ctx.moveTo(sideSign * 19, 20);
-        ctx.bezierCurveTo(sideSign * 19, -8, sideSign * 12, -23, sideSign * 3, -21);
-        ctx.bezierCurveTo(sideSign * -8, -18, sideSign * -16, -6, sideSign * -21, 8);
+        ctx.bezierCurveTo(sideSign * 19, -8, sideSign * 12 + tb * 0.5, -23, sideSign * 3 + tb, -21);
+        ctx.bezierCurveTo(sideSign * -8 + tb * 0.4, -18, sideSign * -16, -6, sideSign * -21, 8);
         ctx.closePath();
       };
 
@@ -3515,8 +3777,8 @@ export class KuroCatEngine {
         ctx.lineCap = 'round';
         ctx.beginPath();
         ctx.moveTo(sideSign * 19, 17);
-        ctx.bezierCurveTo(sideSign * 19, -8, sideSign * 12, -23, sideSign * 3, -21);
-        ctx.bezierCurveTo(sideSign * -8, -18, sideSign * -16, -6, sideSign * -19, 5);
+        ctx.bezierCurveTo(sideSign * 19, -8, sideSign * 12 + tb * 0.5, -23, sideSign * 3 + tb, -21);
+        ctx.bezierCurveTo(sideSign * -8 + tb * 0.4, -18, sideSign * -16, -6, sideSign * -19, 5);
         ctx.stroke();
       }
 
@@ -3524,8 +3786,8 @@ export class KuroCatEngine {
         ctx.fillStyle = s.earInnerColor;
         ctx.beginPath();
         ctx.moveTo(sideSign * 11, 10);
-        ctx.bezierCurveTo(sideSign * 11, -3, sideSign * 7, -13, sideSign * 2, -11);
-        ctx.bezierCurveTo(sideSign * -4, -9, sideSign * -9, -1, sideSign * -10, 8);
+        ctx.bezierCurveTo(sideSign * 11, -3, sideSign * 7 + tb * 0.35, -13, sideSign * 2 + tb * 0.6, -11);
+        ctx.bezierCurveTo(sideSign * -4 + tb * 0.25, -9, sideSign * -9, -1, sideSign * -10, 8);
         ctx.closePath();
         ctx.fill();
       }
@@ -3544,8 +3806,8 @@ export class KuroCatEngine {
       ctx.restore();
     };
 
-    drawCustomEar(-1, lTwitch);
-    drawCustomEar(1, rTwitch);
+    drawCustomEar(-1);
+    drawCustomEar(1);
 
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
@@ -3613,6 +3875,7 @@ export class KuroCatEngine {
       wShift,
       s.outlineColor || (s.isDarkBase ? 'rgba(255, 226, 214, 0.92)' : 'rgba(56, 46, 40, 0.92)'),
     );
+    this.drawHeadphones(ctx, s.isDarkBase, s.accentColor);
 
     ctx.restore();
     ctx.restore();
