@@ -2,6 +2,7 @@ import { KuroCatEngine, type CatMood, type KeyboardOrientation } from '../../src
 import { catAudio } from '../../src/audio';
 import type { KeyboardLayoutId } from '../../src/keyboardLayout';
 import { BUILTIN_WEB_CATS } from './builtinCats';
+import { initDownloadStats } from './downloads';
 import { keyboardEventToVk } from './webKeyMap';
 
 const GITHUB_REPO = 'xpfyg/kurocat';
@@ -741,3 +742,4 @@ initPlayground();
 initMcpCodeTabs();
 initPolish();
 void syncGithubMetadata();
+void initDownloadStats();

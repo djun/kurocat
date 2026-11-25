@@ -1,0 +1,40 @@
+{
+  "updated_at": "2026-11-25T03:46:34Z",
+  "total": 596,
+  "win": 447,
+  "mac": 76,
+  "linux": 73,
+  "releases": [
+    {
+      "tag": "v4.7.0",
+      "date": "2026-11-24",
+      "downloads": 38
+    },
+    {
+      "tag": "v4.8.0",
+      "date": "2026-11-24",
+      "downloads": 65
+    },
+    {
+      "tag": "v4.8.1",
+      "date": "2026-11-24",
+      "downloads": 341
+    },
+    {
+      "tag": "v4.8.2",
+      "date": "2026-11-25",
+      "downloads": 58
+    },
+    {
+      "tag": "v4.8.3",
+      "date": "2026-11-25",
+      "downloads": 94
+    }
+  ],
+  "history": [
+    {
+      "date": "2026-11-25",
+      "total": 596
+    }
+  ]
+}

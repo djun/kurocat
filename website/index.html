@@ -260,6 +260,26 @@
         </article>
       </div>
 
+      <div class="dl-stats-card" id="dl-stats" hidden>
+        <div class="dl-stats-head">
+          <div class="dl-stats-eyebrow">Release Downloads · 实时来自 GitHub</div>
+          <div class="dl-stats-total-row">
+            <span class="dl-stats-total" id="dl-total">0</span>
+            <span class="dl-stats-unit">次安装包下载</span>
+          </div>
+          <p class="dl-stats-sub">
+            统计所有 Release 附件的累计下载量，按时间绘制增长曲线。
+            不含自动更新包、签名文件与无版本号别名文件，避免重复计数。
+          </p>
+        </div>
+        <div class="dl-stats-split" id="dl-split"></div>
+        <svg class="dl-stats-chart" id="dl-chart" viewBox="0 0 640 190" preserveAspectRatio="xMidYMid meet" role="img" aria-label="累计下载增长曲线"></svg>
+        <div class="dl-stats-foot">
+          <span id="dl-stats-meta">数据由 GitHub Actions 每日自动更新</span>
+          <a href="https://github.com/xpfyg/kurocat/releases" target="_blank" rel="noopener">查看全部 Releases →</a>
+        </div>
+      </div>
+
       <div class="macos-tip-card" id="windows-download-tip">
         <div class="macos-tip-left">
           <div class="tip-title">🛡️ Windows 提示「通常不会下载 .exe」怎么办？</div>
