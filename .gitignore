@@ -9,3 +9,10 @@ src-tauri/target-win7/
 .DS_Store
 Thumbs.db
 __pycache__/
+
+# 本地素材：宣传视频/配乐/打包产物等，与项目本身无关，不入库
+local-artifacts/
+
+# 工具与临时目录
+.trae/
+.screenshots/
