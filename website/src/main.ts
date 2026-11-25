@@ -706,16 +706,8 @@ function initMcpCodeTabs(): void {
   });
 }
 
-function initPanModal(): void {
-  const modal = document.getElementById('pan-modal');
-  const copyBtn = document.getElementById('pan-copy-btn');
-  const openers = Array.from(document.querySelectorAll<HTMLElement>('[data-pan-open]'));
-  if (!modal || openers.length === 0) return;
-
+function bindModal(modal: HTMLElement, openers: HTMLElement[]): void {
   let lastTrigger: HTMLElement | null = null;
-
-  const shareText =
-    '我用夸克网盘给你分享了「小猫键盘」，点击链接或复制整段内容，打开「夸克APP」即可获取。\n链接：https://pan.quark.cn/s/d0c3ab148872';
 
   const close = () => {
     modal.hidden = true;
@@ -728,11 +720,11 @@ function initPanModal(): void {
       lastTrigger = trigger;
       modal.hidden = false;
       document.body.style.overflow = 'hidden';
-      modal.querySelector<HTMLButtonElement>('[data-pan-close]')?.focus();
+      modal.querySelector<HTMLButtonElement>('[data-modal-close]')?.focus();
     });
   });
 
-  modal.querySelectorAll('[data-pan-close]').forEach((el) => {
+  modal.querySelectorAll('[data-modal-close]').forEach((el) => {
     el.addEventListener('click', close);
   });
 
@@ -743,6 +735,18 @@ function initPanModal(): void {
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !modal.hidden) close();
   });
+}
+
+function initPanModal(): void {
+  const modal = document.getElementById('pan-modal');
+  const copyBtn = document.getElementById('pan-copy-btn');
+  const openers = Array.from(document.querySelectorAll<HTMLElement>('[data-pan-open]'));
+  if (!modal || openers.length === 0) return;
+
+  bindModal(modal, openers);
+
+  const shareText =
+    '我用夸克网盘给你分享了「小猫键盘」，点击链接或复制整段内容，打开「夸克APP」即可获取。\n链接：https://pan.quark.cn/s/d0c3ab148872';
 
   copyBtn?.addEventListener('click', async () => {
     let copied = false;
@@ -765,6 +769,14 @@ function initPanModal(): void {
       copyBtn.textContent = original;
     }, 1800);
   });
+}
+
+function initRewardModal(): void {
+  const modal = document.getElementById('reward-modal');
+  const openers = Array.from(document.querySelectorAll<HTMLElement>('[data-reward-open]'));
+  if (!modal || openers.length === 0) return;
+
+  bindModal(modal, openers);
 }
 
 function initPolish(): void {
@@ -802,6 +814,7 @@ applyReleaseUI(DEFAULT_RELEASE_TAG, buildDefaultAssets());
 initPlayground();
 initMcpCodeTabs();
 initPanModal();
+initRewardModal();
 initPolish();
 void syncGithubMetadata();
 void initDownloadStats();

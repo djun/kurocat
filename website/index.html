@@ -21,10 +21,10 @@
   <div class="ticker" aria-hidden="true">
     <div class="ticker-track">
       <span class="ticker-group">
-        <span>KUROCAT</span><span>一只会打字的桌面小黑猫</span><span>OPEN SOURCE</span><span>WINDOWS / MACOS / LINUX</span><span>TAURI + RUST</span><span>MIT LICENSE</span>
+        <span>KUROCAT</span><span>一只会打字的桌面小黑猫</span><span>OPEN SOURCE</span><span>WINDOWS / MACOS / LINUX</span><span>完全免费 · 无广告</span><span>MIT LICENSE</span>
       </span>
       <span class="ticker-group">
-        <span>KUROCAT</span><span>一只会打字的桌面小黑猫</span><span>OPEN SOURCE</span><span>WINDOWS / MACOS / LINUX</span><span>TAURI + RUST</span><span>MIT LICENSE</span>
+        <span>KUROCAT</span><span>一只会打字的桌面小黑猫</span><span>OPEN SOURCE</span><span>WINDOWS / MACOS / LINUX</span><span>完全免费 · 无广告</span><span>MIT LICENSE</span>
       </span>
     </div>
   </div>
@@ -80,9 +80,8 @@
         </div>
 
         <p class="hero-sub">
-          基于 Tauri v2、Rust 原生键鼠钩子与 Canvas 2D 打造的桌面伙伴。透明置顶、轻量常驻，内置
-          <strong>6 款手绘猫咪 + 🐳 大肥鱼</strong>、<strong>6 种实时心情</strong>、<strong>输密码自动闭眼防偷窥</strong>、<strong>65% / 108 键切换</strong>
-          与 <strong>原生 MCP 协议</strong>，让 AI 一句话捏出你家的猫。
+          一只住在桌面上的小黑猫：你敲键盘，它就跟着敲；输密码时它会自动闭眼；还能换皮肤、调大小、切换键盘布局。
+          内置 <strong>6 款手绘猫咪 + 🐳 大肥鱼</strong>、<strong>6 种实时心情</strong> 与 <strong>65% / 108 键切换</strong>，Windows 和 macOS 都能用。
         </p>
 
         <div class="hero-actions hero-downloads">
@@ -105,7 +104,7 @@
         <div class="hero-specs">
           <div class="hero-spec-item">
             <div class="spec-val">1.62 MB</div>
-            <div class="spec-lbl">原生 Rust 安装包</div>
+            <div class="spec-lbl">轻量安装包</div>
           </div>
           <div class="hero-spec-item">
             <div class="spec-val">6 种心情</div>
@@ -197,6 +196,18 @@
       </div>
     </section>
 
+    <section class="notice-block reveal" id="about">
+      <div class="notice-card">
+        <div class="notice-badge">关于这个小项目</div>
+        <div class="notice-copy">
+          <p>喵～这是基于开源项目二次创作的小项目，完全免费、没有广告，猫猫也不会偷偷扒你钱包 🆓</p>
+          <p>想养一只专属猫猫？把源码丢给 AI，随便捏、随便改，想让它长啥样就长啥样 ✨</p>
+          <p>要是这只小猫让你多笑了两秒，赏条小鱼干支持下作者更新就好啦 🐟💗</p>
+        </div>
+        <button class="btn-lime notice-reward-btn" type="button" data-reward-open aria-haspopup="dialog">打赏支持</button>
+      </div>
+    </section>
+
     <section class="section-block reveal" id="download">
       <div class="section-header">
         <div class="section-meta">
@@ -205,8 +216,8 @@
         </div>
         <h2 class="section-title">选择你的平台，<br />立刻把它带回家</h2>
         <p class="section-sub">
-          安装包由 GitHub Actions 编译并发布，下载按钮直接前往当前仓库的官方 Release 附件。
-          两个平台均支持 <strong>20%–150% 无级缩放</strong>、<strong>65% / 108 键切换</strong> 与 <strong>App 内自动更新</strong>。
+          下载后双击安装即可使用；如果 GitHub 直连不稳定，推荐使用上方的夸克网盘。
+          两个平台均支持 <strong>20%–150% 无级缩放</strong>、<strong>65% / 108 键切换</strong> 与 <strong>应用内自动更新</strong>。
         </p>
       </div>
 
@@ -563,7 +574,7 @@
 
   <div class="pan-modal" id="pan-modal" role="dialog" aria-modal="true" aria-labelledby="pan-modal-title" hidden>
     <div class="pan-modal-card">
-      <button class="pan-modal-close" type="button" data-pan-close aria-label="关闭">×</button>
+      <button class="pan-modal-close" type="button" data-modal-close aria-label="关闭">×</button>
       <div class="pan-modal-grid">
         <div class="pan-qr-box">
           <img class="pan-qr" src="./assets/quark-qr.png" alt="夸克网盘「小猫键盘」分享二维码" width="568" height="568" />
@@ -581,6 +592,28 @@
             <a class="btn-outline" href="https://pan.quark.cn/s/d0c3ab148872" target="_blank" rel="noopener">打开网盘 →</a>
           </div>
           <p class="pan-note">手机可扫码或用夸克 APP 粘贴文案；电脑端直接点「打开网盘」。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pan-modal" id="reward-modal" role="dialog" aria-modal="true" aria-labelledby="reward-modal-title" hidden>
+    <div class="pan-modal-card reward-modal-card">
+      <button class="pan-modal-close" type="button" data-modal-close aria-label="关闭">×</button>
+      <div class="reward-grid">
+        <div class="pan-qr-box">
+          <img class="pan-qr" id="reward-qr-img" src="./assets/reward-qr.jpg" alt="支付宝收款码" width="1280" height="1919" />
+          <span class="pan-qr-caption">支付宝扫码打赏 · 感谢支持</span>
+        </div>
+        <div class="pan-modal-body">
+          <span class="pan-eyebrow">Support · 打赏</span>
+          <h3 class="pan-title" id="reward-modal-title">请猫猫吃罐罐 🐟</h3>
+          <p class="pan-share-text">
+            这个项目完全免费、没有广告，作者也没打算加（真的，别劝了 😼）。<br />
+            如果这只小猫让你多笑了两秒，欢迎用支付宝扫码投喂一下，让作者有动力继续更新～<br />
+            猫猫已经替我谢谢你啦 🐾
+          </p>
+          <p class="pan-note">打赏完全自愿，不影响任何功能，也不解锁额外内容 —— 纯属给猫猫买小鱼干 🐡</p>
         </div>
       </div>
     </div>

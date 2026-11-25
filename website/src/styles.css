@@ -1964,6 +1964,81 @@ footer {
   }
 }
 
+.notice-block {
+  margin: 34px 0 8px;
+}
+
+.notice-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  background: var(--paper-2);
+  border: var(--line);
+  border-left: 6px solid var(--gold);
+  border-radius: 2px;
+  box-shadow: 6px 6px 0 var(--ink);
+  padding: 22px 24px;
+}
+
+.notice-badge {
+  align-self: flex-start;
+  flex-shrink: 0;
+  background: var(--ink);
+  color: var(--paper-2);
+  padding: 5px 9px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.notice-copy {
+  flex: 1 1 360px;
+  min-width: 0;
+}
+
+.notice-copy p {
+  font-size: 14px;
+  line-height: 1.9;
+  color: var(--ink-2);
+}
+
+.notice-copy p + p {
+  margin-top: 2px;
+}
+
+.notice-reward-btn {
+  flex-shrink: 0;
+}
+
+.reward-modal-card {
+  width: min(620px, 100%);
+}
+
+.reward-grid {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 26px;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .reward-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .notice-card {
+    align-items: stretch;
+  }
+
+  .notice-reward-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .pan-modal {
   position: fixed;
   inset: 0;
