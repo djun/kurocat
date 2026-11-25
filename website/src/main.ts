@@ -5,8 +5,8 @@ import { BUILTIN_WEB_CATS } from './builtinCats';
 import { keyboardEventToVk } from './webKeyMap';
 
 const GITHUB_REPO = 'xpfyg/kurocat';
-const DEFAULT_RELEASE_TAG = 'v4.8.0';
-const DEFAULT_VERSION = '4.8.0';
+const DEFAULT_RELEASE_TAG = 'v4.8.1';
+const DEFAULT_VERSION = '4.8.1';
 
 interface ReleaseAsset {
   name: string;
@@ -16,16 +16,17 @@ interface ReleaseAsset {
 
 type ReleaseAssetMap = Record<'win65' | 'macos', ReleaseAsset>;
 
-function releaseAssetUrl(tag: string, name: string): string {
-  return `https://github.com/${GITHUB_REPO}/releases/download/${tag}/${name}`;
+function releaseAssetUrl(name: string): string {
+  // GitHub 的 latest/download 会 302 到最新 Release 的真实附件，直接触发下载。
+  return `https://github.com/${GITHUB_REPO}/releases/latest/download/${name}`;
 }
 
 function buildDefaultAssets(): ReleaseAssetMap {
   const winName = `KuroCat-${DEFAULT_VERSION}-x64-setup.exe`;
   const macName = `KuroCat-${DEFAULT_RELEASE_TAG}-macos-universal.dmg`;
   return {
-    win65: { name: winName, url: releaseAssetUrl(DEFAULT_RELEASE_TAG, winName), sizeText: '1.62 MB' },
-    macos: { name: macName, url: releaseAssetUrl(DEFAULT_RELEASE_TAG, macName), sizeText: '5.50 MB' },
+    win65: { name: winName, url: releaseAssetUrl(winName), sizeText: '1.62 MB' },
+    macos: { name: macName, url: releaseAssetUrl(macName), sizeText: '5.50 MB' },
   };
 }
 
