@@ -1,3 +1,7 @@
+> **原项目：[qianyiai/kurocat](https://github.com/qianyiai/kurocat)**
+>
+> 本项目是在原项目 [qianyiai/kurocat](https://github.com/qianyiai/kurocat) 基础上进行的二次开发（衍生作品），遵循原项目的开源协议（[MIT License](./LICENSE)）。本项目与原作者无关，不代表原作者立场；原项目的版权与贡献归原作者及所有贡献者所有。
+
 # KuroCat
 
 一只住在桌面上的打字小黑猫。透明、置顶、极轻量，你敲键盘它就跟着敲；支持 Windows 与 macOS，内置 7 款皮肤、6 种实时心情、密码防偷窥、65% / 108 键切换和 AI 捏猫。
