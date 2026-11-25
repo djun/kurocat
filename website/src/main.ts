@@ -5,8 +5,8 @@ import { BUILTIN_WEB_CATS } from './builtinCats';
 import { keyboardEventToVk } from './webKeyMap';
 
 const GITHUB_REPO = 'xpfyg/kurocat';
-const DEFAULT_RELEASE_TAG = 'v4.8.1';
-const DEFAULT_VERSION = '4.8.1';
+const DEFAULT_RELEASE_TAG = 'v4.8.2';
+const DEFAULT_VERSION = '4.8.2';
 
 interface ReleaseAsset {
   name: string;
@@ -272,6 +272,157 @@ function initPlayground(): void {
       purrEnabled = !purrEnabled;
       catAudio.setEnabled(purrEnabled);
       btnPurr.classList.toggle('active', purrEnabled);
+    });
+  }
+
+  // Interactive Lo-Fi Music Demo toggle (synthesizes cozy Web Audio BGM + triggers cat headphones & sway)
+  const createLoFiDemoPlayer = () => {
+    let ctx: AudioContext | null = null;
+    let master: GainNode | null = null;
+    let timer: number | null = null;
+    let step = 0;
+
+    // Dreamy lo-fi chord progression (Fmaj7 -> Em7 -> Dm9 -> Cmaj9) in Hz
+    const chords: number[][] = [
+      [174.61, 220.0, 261.63, 329.63],
+      [164.81, 196.0, 246.94, 293.66],
+      [146.83, 220.0, 261.63, 329.63],
+      [130.81, 196.0, 246.94, 293.66],
+    ];
+    // Sparse warm kalimba-like melody notes aligned to 8th-note steps (16 steps per 4-chord cycle)
+    const melody: Array<number | null> = [
+      523.25, null, 659.25, 587.33,
+      493.88, null, 587.33, null,
+      440.0, 523.25, 659.25, null,
+      587.33, null, 523.25, null,
+    ];
+
+    const ensureCtx = () => {
+      if (!ctx) {
+        const AC =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        if (!AC) return false;
+        ctx = new AC();
+        master = ctx.createGain();
+        master.gain.value = 0;
+        const warmth = ctx.createBiquadFilter();
+        warmth.type = 'lowpass';
+        warmth.frequency.value = 1650;
+        warmth.Q.value = 0.7;
+        master.connect(warmth);
+        warmth.connect(ctx.destination);
+      }
+      if (ctx.state === 'suspended') {
+        void ctx.resume().catch(() => {});
+      }
+      return Boolean(ctx && master);
+    };
+
+    const playNote = (
+      freq: number,
+      dur: number,
+      vol: number,
+      type: OscillatorType,
+      when: number,
+    ) => {
+      if (!ctx || !master) return;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, when);
+      gain.gain.setValueAtTime(0.0001, when);
+      gain.gain.exponentialRampToValueAtTime(vol, when + 0.035);
+      gain.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+      osc.connect(gain);
+      gain.connect(master);
+      osc.start(when);
+      osc.stop(when + dur + 0.04);
+    };
+
+    const playSoftKick = (when: number) => {
+      if (!ctx || !master) return;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(115, when);
+      osc.frequency.exponentialRampToValueAtTime(42, when + 0.14);
+      gain.gain.setValueAtTime(0.28, when);
+      gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.22);
+      osc.connect(gain);
+      gain.connect(master);
+      osc.start(when);
+      osc.stop(when + 0.25);
+    };
+
+    const tick = () => {
+      if (!ctx || !master) return;
+      const now = ctx.currentTime + 0.02;
+      const idx = step % 16;
+
+      // Play warm Rhodes chord at the start of every 4 steps
+      if (idx % 4 === 0) {
+        const chord = chords[(idx / 4) % chords.length];
+        chord.forEach((f, i) => {
+          playNote(f, 1.55, 0.085, 'triangle', now + i * 0.018);
+        });
+      }
+
+      // Soft lo-fi kick on beats 0 and 2 of each bar
+      if (idx % 4 === 0 || idx % 4 === 2) {
+        playSoftKick(now);
+      }
+
+      // Gentle bell melody on top
+      const mel = melody[idx];
+      if (mel) {
+        playNote(mel, 0.72, 0.075, 'sine', now);
+      }
+
+      step += 1;
+    };
+
+    return {
+      start() {
+        if (!ensureCtx() || !ctx || !master) return;
+        const now = ctx.currentTime;
+        master.gain.cancelScheduledValues(now);
+        master.gain.setTargetAtTime(0.22, now, 0.14);
+        step = 0;
+        tick();
+        if (timer !== null) window.clearInterval(timer);
+        timer = window.setInterval(tick, 385);
+      },
+      stop() {
+        if (timer !== null) {
+          window.clearInterval(timer);
+          timer = null;
+        }
+        if (ctx && master) {
+          const now = ctx.currentTime;
+          master.gain.cancelScheduledValues(now);
+          master.gain.setTargetAtTime(0.0001, now, 0.12);
+        }
+      },
+    };
+  };
+
+  const lofiPlayer = createLoFiDemoPlayer();
+  let musicDemoPlaying = false;
+  const btnMusicDemo = document.getElementById('btn-music-demo');
+  if (btnMusicDemo) {
+    btnMusicDemo.addEventListener('click', () => {
+      musicDemoPlaying = !musicDemoPlaying;
+      btnMusicDemo.classList.toggle('active', musicDemoPlaying);
+      btnMusicDemo.textContent = musicDemoPlaying ? '🎧 听歌中' : '🎧 听歌';
+      if (musicDemoPlaying) {
+        // Clear any pinned mood preview so real musicPlaying drives headphones + relaxed sway naturally
+        setMoodPreview(null);
+        lofiPlayer.start();
+      } else {
+        lofiPlayer.stop();
+      }
+      engine.setMusicPlaying(musicDemoPlaying);
     });
   }
 
