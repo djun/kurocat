@@ -89,13 +89,14 @@
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 12.5h7a3 3 0 0 0 .3-6 4.5 4.5 0 0 0-8.6-1.1A3.6 3.6 0 0 0 4.5 12.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
             夸克网盘下载（推荐）
           </button>
-          <a class="btn-outline" id="hero-win-dl" href="https://github.com/xpfyg/kurocat/releases/latest/download/KuroCat-x64-setup.exe" target="_blank" rel="noopener">
+          <a class="btn-outline" id="hero-win-dl" data-reward-download data-platform="Windows" href="https://github.com/xpfyg/kurocat/releases/latest/download/KuroCat-x64-setup.exe" target="_blank" rel="noopener">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2.2v7.6m0 0L4.8 6.6M8 9.8l3.2-3.2M2.5 12.8h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <span id="hero-win-dl-label">GitHub · Windows 版</span>
           </a>
-          <a class="btn-outline hero-mac-btn" id="hero-mac-dl" href="https://github.com/xpfyg/kurocat/releases/latest/download/KuroCat-macos-universal.dmg" target="_blank" rel="noopener">
+          <a class="btn-outline hero-mac-btn" id="hero-mac-dl" data-reward-download data-platform="macOS" href="https://github.com/xpfyg/kurocat/releases/latest/download/KuroCat-macos-universal.dmg" target="_blank" rel="noopener">
             <span id="hero-mac-dl-label">GitHub · macOS 版</span>
           </a>
+          <button class="btn-outline btn-reward-inline" type="button" data-reward-open aria-haspopup="dialog">💗 打赏支持</button>
           <a class="btn-ghost" href="https://github.com/xpfyg/kurocat" target="_blank" rel="noopener">GitHub 源码 →</a>
         </div>
 
@@ -254,7 +255,7 @@
             <span class="dl-size" data-asset-size="win65">1.62 MB</span>
           </div>
           <div class="dl-actions">
-            <a class="btn-lime btn-full" data-dl-primary="win65" href="https://github.com/xpfyg/kurocat/releases/latest/download/KuroCat-x64-setup.exe" target="_blank" rel="noopener">
+            <a class="btn-lime btn-full" data-dl-primary="win65" data-reward-download data-platform="Windows" href="https://github.com/xpfyg/kurocat/releases/latest/download/KuroCat-x64-setup.exe" target="_blank" rel="noopener">
               从 GitHub 下载 Windows 版 →
             </a>
           </div>
@@ -281,7 +282,7 @@
             <span class="dl-size" data-asset-size="macos">5.50 MB</span>
           </div>
           <div class="dl-actions">
-            <a class="btn-solid btn-full" data-dl-primary="macos" href="https://github.com/xpfyg/kurocat/releases/latest/download/KuroCat-macos-universal.dmg" target="_blank" rel="noopener">
+            <a class="btn-solid btn-full" data-dl-primary="macos" data-reward-download data-platform="macOS" href="https://github.com/xpfyg/kurocat/releases/latest/download/KuroCat-macos-universal.dmg" target="_blank" rel="noopener">
               从 GitHub 下载 macOS 版 →
             </a>
           </div>
@@ -614,6 +615,10 @@
             猫猫已经替我谢谢你啦 🐾
           </p>
           <p class="pan-note">打赏完全自愿，不影响任何功能，也不解锁额外内容 —— 纯属给猫猫买小鱼干 🐡</p>
+          <div class="reward-skip-wrap" id="reward-skip-wrap" style="display: none">
+            <span class="reward-skip-hint">只想先装猫猫？完全没问题 👇</span>
+            <a class="reward-skip-link" id="reward-skip-dl" href="#" target="_blank" rel="noopener">先不打赏，直接下载 →</a>
+          </div>
         </div>
       </div>
     </div>

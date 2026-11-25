@@ -706,7 +706,7 @@ function initMcpCodeTabs(): void {
   });
 }
 
-function bindModal(modal: HTMLElement, openers: HTMLElement[]): void {
+function bindModal(modal: HTMLElement, openers: HTMLElement[]): { open: (trigger?: HTMLElement) => void } {
   let lastTrigger: HTMLElement | null = null;
 
   const close = () => {
@@ -715,13 +715,15 @@ function bindModal(modal: HTMLElement, openers: HTMLElement[]): void {
     lastTrigger?.focus();
   };
 
+  const open = (trigger?: HTMLElement) => {
+    if (trigger) lastTrigger = trigger;
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+    modal.querySelector<HTMLButtonElement>('[data-modal-close]')?.focus();
+  };
+
   openers.forEach((trigger) => {
-    trigger.addEventListener('click', () => {
-      lastTrigger = trigger;
-      modal.hidden = false;
-      document.body.style.overflow = 'hidden';
-      modal.querySelector<HTMLButtonElement>('[data-modal-close]')?.focus();
-    });
+    trigger.addEventListener('click', () => open(trigger));
   });
 
   modal.querySelectorAll('[data-modal-close]').forEach((el) => {
@@ -735,6 +737,8 @@ function bindModal(modal: HTMLElement, openers: HTMLElement[]): void {
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !modal.hidden) close();
   });
+
+  return { open };
 }
 
 function initPanModal(): void {
@@ -773,10 +777,49 @@ function initPanModal(): void {
 
 function initRewardModal(): void {
   const modal = document.getElementById('reward-modal');
-  const openers = Array.from(document.querySelectorAll<HTMLElement>('[data-reward-open]'));
-  if (!modal || openers.length === 0) return;
+  if (!modal) return;
 
-  bindModal(modal, openers);
+  const openers = Array.from(document.querySelectorAll<HTMLElement>('[data-reward-open]'));
+  const skipWrap = document.getElementById('reward-skip-wrap');
+  const skipLink = document.getElementById('reward-skip-dl') as HTMLAnchorElement | null;
+  const { open } = bindModal(modal, []);
+
+  const resetSkip = () => {
+    if (skipWrap) skipWrap.style.display = 'none';
+    if (skipLink) {
+      skipLink.href = '#';
+      skipLink.textContent = '先不打赏，直接下载 →';
+    }
+  };
+
+  openers.forEach((trigger) => {
+    trigger.addEventListener('click', () => {
+      resetSkip();
+      open(trigger);
+    });
+  });
+
+  document.querySelectorAll<HTMLAnchorElement>('[data-reward-download]').forEach((trigger) => {
+    trigger.addEventListener('click', (event) => {
+      const href = trigger.getAttribute('href');
+      if (!href) return;
+      event.preventDefault();
+
+      const platform = trigger.dataset.platform;
+      if (skipLink) {
+        skipLink.href = href;
+        skipLink.textContent = platform ? `先不打赏，直接下载 ${platform} 版 →` : '先不打赏，直接下载 →';
+      }
+      skipWrap?.removeAttribute('hidden');
+      if (skipWrap) skipWrap.style.display = 'flex';
+      open(trigger);
+    });
+  });
+
+  skipLink?.addEventListener('click', () => {
+    modal.hidden = true;
+    document.body.style.overflow = '';
+  });
 }
 
 function initPolish(): void {
