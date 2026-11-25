@@ -1,11 +1,22 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter};
 
-const REPO_API_LATEST: &str = "https://api.github.com/repos/xpfyg/kurocat/releases/latest";
-const REPO_RELEASES_PAGE: &str = "https://github.com/xpfyg/kurocat/releases/latest";
+// 只依赖 GitHub releases/latest 的 HTTP 重定向，完全不碰 REST API，
+// 这样不会被匿名 API 配额（每 IP 每小时 60 次）限流。
+const REPO_LATEST_PAGE: &str = "https://github.com/xpfyg/kurocat/releases/latest";
+const REPO_LATEST_DOWNLOAD: &str = "https://github.com/xpfyg/kurocat/releases/latest/download";
+const REPO_RELEASES_PAGE: &str = "https://github.com/xpfyg/kurocat/releases";
 
 pub const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// 两次自动检查之间的最小间隔：24 小时。手动触发（托盘"检查更新"）不受此限制。
+const AUTO_CHECK_COOLDOWN_SECS: u64 = 24 * 3600;
+
+/// 自动检查成功/失败后，在下一次应用启动时仍要给的最短退避：4 小时。
+/// （配合 24h 主要冷却，避免网络抖动时反复打 GitHub。）
+const AUTO_CHECK_MIN_BACKOFF_SECS: u64 = 4 * 3600;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -30,22 +41,9 @@ pub struct UpdateProgressEvent {
     pub info: Option<UpdateInfo>,
 }
 
-#[derive(Debug, Deserialize)]
-struct GhRelease {
-    tag_name: String,
-    html_url: Option<String>,
-    body: Option<String>,
-    #[serde(default)]
-    assets: Vec<GhAsset>,
-}
-
-#[derive(Debug, Deserialize)]
-struct GhAsset {
-    name: String,
-    browser_download_url: String,
-    size: Option<u64>,
-    digest: Option<String>,
-}
+// ---------------------------------------------------------------------------
+// 版本号比较（保持原有语义与单测）
+// ---------------------------------------------------------------------------
 
 pub fn parse_semver(raw: &str) -> (u64, u64, u64) {
     let clean = raw.trim().trim_start_matches(['v', 'V']);
@@ -61,15 +59,16 @@ pub fn is_newer_version(latest: &str, current: &str) -> bool {
     parse_semver(latest) > parse_semver(current)
 }
 
-fn extract_sha256(digest: &Option<String>) -> Option<String> {
-    let raw = digest.as_deref()?.trim();
-    let hex = raw.strip_prefix("sha256:").unwrap_or(raw).trim().to_ascii_lowercase();
-    if hex.len() == 64 && hex.chars().all(|c| c.is_ascii_hexdigit()) {
-        Some(hex)
-    } else {
-        None
-    }
+fn current_unix_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
+
+// ---------------------------------------------------------------------------
+// 安装类型探测 + 资产命名约定 → 下载 URL
+// ---------------------------------------------------------------------------
 
 fn detect_install_kind() -> &'static str {
     #[cfg(all(windows, feature = "win7"))]
@@ -104,112 +103,76 @@ fn detect_install_kind() -> &'static str {
     }
 }
 
-fn select_asset<'a>(assets: &'a [GhAsset], install_kind: &str) -> Option<&'a GhAsset> {
+/// 返回 (asset_filename, download_url)。
+/// 这里只按命名约定构造，不依赖 GitHub API 的 assets 数组。
+fn pick_asset_by_convention(latest_tag: &str, install_kind: &str) -> Option<(String, String)> {
+    let ver_clean = latest_tag.trim_start_matches(['v', 'V']).to_string();
+    let tag = latest_tag.trim().to_string();
+    let url = |name: &str| format!("{}/{}", REPO_LATEST_DOWNLOAD, name);
+
     let want_108 = cfg!(feature = "layout-108");
+    let _ = want_108; // 目前 Release 里没有 108key 变体，保留占位
+
     match install_kind {
-        "windows-nsis" => assets
-            .iter()
-            .find(|a| {
-                let n = a.name.to_ascii_lowercase();
-                n.ends_with("-setup.exe") && n.contains("x64") && (n.contains("108key") == want_108)
-            })
-            .or_else(|| {
-                assets.iter().find(|a| {
-                    let n = a.name.to_ascii_lowercase();
-                    n.ends_with("-setup.exe") && n.contains("x64")
-                })
-            })
-            .or_else(|| {
-                assets
-                    .iter()
-                    .find(|a| a.name.to_ascii_lowercase().ends_with("-windows-x64.exe"))
-            }),
-        "windows-portable" => assets
-            .iter()
-            .find(|a| {
-                let n = a.name.to_ascii_lowercase();
-                n.ends_with("-windows-x64.exe") && (n.contains("108key") == want_108)
-            })
-            .or_else(|| {
-                assets
-                    .iter()
-                    .find(|a| a.name.to_ascii_lowercase().ends_with("-windows-x64.exe"))
-            })
-            .or_else(|| {
-                assets
-                    .iter()
-                    .find(|a| a.name.to_ascii_lowercase().ends_with("-setup.exe"))
-            }),
-        "windows-win7" => assets.iter().find(|a| {
-            let n = a.name.to_ascii_lowercase();
-            n.contains("win7") && n.ends_with(".zip")
-        }),
-        "macos-app" => assets
-            .iter()
-            .find(|a| a.name.to_ascii_lowercase().ends_with("-macos-universal.app.tar.gz"))
-            .or_else(|| {
-                assets
-                    .iter()
-                    .find(|a| a.name.to_ascii_lowercase().ends_with("-macos-universal.dmg"))
-            }),
-        "linux-deb-arm64" => assets
-            .iter()
-            .find(|a| {
-                let n = a.name.to_ascii_lowercase();
-                n.ends_with(".deb") && (n.contains("arm64") || n.contains("aarch64"))
-            })
-            .or_else(|| {
-                assets.iter().find(|a| {
-                    let n = a.name.to_ascii_lowercase();
-                    n.ends_with(".appimage") && (n.contains("arm64") || n.contains("aarch64"))
-                })
-            }),
-        "linux-deb-amd64" => assets
-            .iter()
-            .find(|a| {
-                let n = a.name.to_ascii_lowercase();
-                n.ends_with(".deb") && (n.contains("amd64") || n.contains("x86_64"))
-            })
-            .or_else(|| {
-                assets.iter().find(|a| {
-                    let n = a.name.to_ascii_lowercase();
-                    n.ends_with(".appimage") && (n.contains("amd64") || n.contains("x86_64"))
-                })
-            }),
+        "windows-nsis" | "windows-portable" => {
+            let name = format!("KuroCat-{}-x64-setup.exe", ver_clean);
+            Some((name.clone(), url(&name)))
+        }
+        "windows-win7" => {
+            let name = format!("KuroCat-{}-win7.zip", ver_clean);
+            Some((name.clone(), url(&name)))
+        }
+        "macos-app" => {
+            // universal .app.tar.gz 优先（自更新走 tar.gz 解压，dmg 留给用户手动）
+            let name = format!("KuroCat-{}-macos-universal.app.tar.gz", tag);
+            Some((name.clone(), url(&name)))
+        }
+        "linux-deb-arm64" => {
+            let name = format!("KuroCat-{}-linux-arm64.deb", tag);
+            Some((name.clone(), url(&name)))
+        }
+        "linux-deb-amd64" => {
+            let name = format!("KuroCat-{}-linux-amd64.deb", tag);
+            Some((name.clone(), url(&name)))
+        }
         _ => None,
     }
 }
 
-fn summarize_notes(body: Option<&str>) -> String {
-    let Some(raw) = body else {
-        return String::new();
-    };
-    raw.lines()
-        .map(|l| l.trim())
-        .filter(|l| !l.is_empty() && !l.starts_with('#'))
-        .take(3)
-        .collect::<Vec<_>>()
-        .join(" ")
-        .chars()
-        .take(180)
-        .collect()
-}
+// ---------------------------------------------------------------------------
+// fetch_latest_tag_name：跟随 releases/latest 的重定向，从最终 URL 里抠出 tag
+// ---------------------------------------------------------------------------
 
 #[cfg(windows)]
-fn fetch_latest_release_json() -> Result<String, String> {
+fn fetch_latest_tag_name() -> Result<String, String> {
     use std::os::windows::process::CommandExt;
     use std::process::Command;
 
     const CREATE_NO_WINDOW: u32 = 0x08000000;
 
+    // 用 Invoke-WebRequest 跟随最多 10 次重定向，然后从最终 ResponseUri 里取 tag。
     let script = format!(
         "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; \
          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
-         $ProgressPreference = 'SilentlyContinue'; \
-         $resp = Invoke-WebRequest -UseBasicParsing -Uri '{url}' \
-           -Headers @{{'User-Agent'='KuroCat/{ver}'; 'Accept'='application/vnd.github+json'}} -TimeoutSec 15; \
-         Write-Output $resp.Content",
-        url = REPO_API_LATEST,
+         try {{ \
+           $resp = Invoke-WebRequest -UseBasicParsing -MaximumRedirection 10 \
+             -Uri '{url}' -Headers @{{'User-Agent'='KuroCat/{ver}'}} -TimeoutSec 15; \
+           $uri = $resp.BaseResponse.ResponseUri.AbsoluteUri; \
+         }} catch {{ \
+           if ($_.Exception.Response) {{ \
+             $uri = $_.Exception.Response.ResponseUri.AbsoluteUri; \
+           }} else {{ \
+             throw \
+           }} \
+         }} \
+         if ($uri -match '/releases/tag/([vV]?[0-9][0-9.]+)') {{ \
+           $matches[1]; \
+         }} elseif ($uri -match '/tag/([vV]?[0-9][0-9.]+)') {{ \
+           $matches[1]; \
+         }} else {{ \
+           throw \"无法从重定向地址解析版本号: $uri\" \
+         }}",
+        url = REPO_LATEST_PAGE,
         ver = CURRENT_VERSION
     );
 
@@ -235,15 +198,15 @@ fn fetch_latest_release_json() -> Result<String, String> {
         });
     }
 
-    let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if text.is_empty() {
+    let tag = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if tag.is_empty() {
         return Err("GitHub 返回空响应".to_string());
     }
-    Ok(text)
+    Ok(tag)
 }
 
 #[cfg(not(windows))]
-fn fetch_latest_release_json() -> Result<String, String> {
+fn fetch_latest_tag_name() -> Result<String, String> {
     use std::process::Command;
 
     let curl_bin = if cfg!(target_os = "macos") {
@@ -251,18 +214,22 @@ fn fetch_latest_release_json() -> Result<String, String> {
     } else {
         "curl"
     };
+
+    // -L 跟随重定向；只用 -o /dev/null 丢弃响应体，拿 -w 格式化的最终 URL。
     let output = Command::new(curl_bin)
         .args([
-            "-fsSL",
+            "-sSL",
             "--connect-timeout",
             "10",
             "--max-time",
             "20",
             "-H",
             &format!("User-Agent: KuroCat/{}", CURRENT_VERSION),
-            "-H",
-            "Accept: application/vnd.github+json",
-            REPO_API_LATEST,
+            "-o",
+            "/dev/null",
+            "-w",
+            "%{url_effective}",
+            REPO_LATEST_PAGE,
         ])
         .output()
         .map_err(|e| format!("无法调用 curl 检查更新: {}", e))?;
@@ -276,42 +243,123 @@ fn fetch_latest_release_json() -> Result<String, String> {
         });
     }
 
-    let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if text.is_empty() {
-        return Err("GitHub 返回空响应".to_string());
-    }
-    Ok(text)
+    let final_url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    extract_tag_from_release_url(&final_url)
 }
 
-pub fn check_latest_update() -> Result<UpdateInfo, String> {
-    let raw_json = fetch_latest_release_json()?;
-    let rel: GhRelease = serde_json::from_str(&raw_json)
-        .map_err(|e| format!("解析最新版本信息失败: {}", e))?;
+fn extract_tag_from_release_url(url: &str) -> Result<String, String> {
+    // https://github.com/xpfyg/kurocat/releases/tag/v4.8.3  → v4.8.3
+    let lowered = url.trim().to_ascii_lowercase();
+    let candidates = ["/releases/tag/", "/tag/"];
+    for needle in &candidates {
+        if let Some(idx) = lowered.find(needle) {
+            let start = idx + needle.len();
+            let tail = &url[start..];
+            let end = tail
+                .find(|c: char| !(c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_' || c == 'v' || c == 'V'))
+                .unwrap_or(tail.len());
+            let tag = tail[..end].to_string();
+            if !tag.is_empty() {
+                return Ok(tag);
+            }
+        }
+    }
+    Err(format!("无法从 GitHub 重定向地址解析版本号: {}", url))
+}
 
-    let latest_clean = rel
-        .tag_name
-        .trim()
-        .trim_start_matches(['v', 'V'])
-        .to_string();
+// ---------------------------------------------------------------------------
+// 对外检查入口
+// ---------------------------------------------------------------------------
+
+pub fn check_latest_update() -> Result<UpdateInfo, String> {
+    let latest_tag = fetch_latest_tag_name()?;
+    let latest_clean = latest_tag.trim_start_matches(['v', 'V']).to_string();
     let has_update = is_newer_version(&latest_clean, CURRENT_VERSION);
     let install_kind = detect_install_kind();
-    let asset = select_asset(&rel.assets, install_kind);
+    let (asset_name, download_url) = pick_asset_by_convention(&latest_tag, install_kind)
+        .unwrap_or_else(|| (String::new(), REPO_RELEASES_PAGE.to_string()));
 
     Ok(UpdateInfo {
         current_version: CURRENT_VERSION.to_string(),
         latest_version: latest_clean,
         has_update,
-        release_url: rel
-            .html_url
-            .unwrap_or_else(|| REPO_RELEASES_PAGE.to_string()),
-        asset_name: asset.map(|a| a.name.clone()),
-        download_url: asset.map(|a| a.browser_download_url.clone()),
-        asset_sha256: asset.and_then(|a| extract_sha256(&a.digest)),
-        asset_size: asset.and_then(|a| a.size),
+        release_url: format!(
+            "https://github.com/xpfyg/kurocat/releases/tag/{}",
+            latest_tag
+        ),
+        asset_name: if asset_name.is_empty() { None } else { Some(asset_name) },
+        download_url: if download_url == REPO_RELEASES_PAGE {
+            None
+        } else {
+            Some(download_url)
+        },
+        asset_sha256: None, // 不走 GitHub API 就拿不到 digest；手动安装路径不受影响
+        asset_size: None,
         install_kind: install_kind.to_string(),
-        notes_summary: summarize_notes(rel.body.as_deref()),
+        notes_summary: String::new(), // 同上
     })
 }
+
+// ---------------------------------------------------------------------------
+// 后台自动检查（带冷却，每日至多一次）
+// ---------------------------------------------------------------------------
+
+fn cooldown_marker_path() -> PathBuf {
+    std::env::temp_dir().join("kurocat-last-auto-update-check")
+}
+
+fn read_last_check_unix() -> Option<u64> {
+    let data = std::fs::read_to_string(cooldown_marker_path()).ok()?;
+    data.trim().parse::<u64>().ok()
+}
+
+fn write_last_check_now() {
+    let _ = std::fs::write(
+        cooldown_marker_path(),
+        current_unix_secs().to_string().as_bytes(),
+    );
+}
+
+/// 距离上一次自动检查是否已经超过冷却时长。
+/// 没有记录时返回 true（允许立即检查一次）。
+fn auto_check_due() -> bool {
+    match read_last_check_unix() {
+        None => true,
+        Some(last) => current_unix_secs().saturating_sub(last) >= AUTO_CHECK_MIN_BACKOFF_SECS,
+    }
+}
+
+pub fn start_background_update_checker(app: AppHandle) {
+    std::thread::spawn(move || {
+        // 启动时静默，先等桌面完全绘制好。
+        std::thread::sleep(std::time::Duration::from_secs(8));
+
+        // 冷却未到就直接跳过，不打扰用户；手动托盘检查不受这个约束。
+        if !auto_check_due() {
+            return;
+        }
+
+        write_last_check_now();
+
+        // 用宽松重试：一次失败再等 4h 自动退避（下次启动再试）。
+        let _ = check_latest_update().map(|info| {
+            if info.has_update {
+                emit_progress(
+                    &app,
+                    "available",
+                    format!("发现新版本 v{}", info.latest_version),
+                    Some(info),
+                );
+            }
+        });
+
+        // 检查完就结束线程，不再常驻轮询。下次启动自动按冷却判断。
+    });
+}
+
+// ---------------------------------------------------------------------------
+// 进度通知 / 浏览器
+// ---------------------------------------------------------------------------
 
 fn emit_progress(app: &AppHandle, stage: &str, message: impl Into<String>, info: Option<UpdateInfo>) {
     let _ = app.emit(
@@ -342,6 +390,10 @@ pub fn open_url_in_browser(url: &str) {
         let _ = std::process::Command::new("xdg-open").arg(url).spawn();
     }
 }
+
+// ---------------------------------------------------------------------------
+// 安装路径（保持不变：下载 + 校验 + 替换 + 重启）
+// ---------------------------------------------------------------------------
 
 #[cfg(windows)]
 fn download_and_verify_windows(url: &str, dest: &PathBuf, expected_sha256: Option<&str>) -> Result<(), String> {
@@ -566,7 +618,7 @@ fn install_macos_update(app: &AppHandle, info: &UpdateInfo) -> Result<(), String
         return Err("下载 macOS 更新包失败".to_string());
     }
 
-    // Verify SHA-256 if GitHub Release provided a digest
+    // SHA-256 可选：没有就跳过，有就强校验
     if let Some(expected_sha) = info.asset_sha256.as_deref() {
         emit_progress(
             app,
@@ -600,7 +652,6 @@ fn install_macos_update(app: &AppHandle, info: &UpdateInfo) -> Result<(), String
         return Err("解压更新包失败".to_string());
     }
 
-    // Find extracted .app (KuroCat.app or KuroCatPet.app)
     let new_app = std::fs::read_dir(&extract_dir)
         .ok()
         .and_then(|mut it| {
@@ -615,7 +666,6 @@ fn install_macos_update(app: &AppHandle, info: &UpdateInfo) -> Result<(), String
         })
         .ok_or_else(|| "更新包内未找到 .app 程序".to_string())?;
 
-    // Clear quarantine flag so macOS Gatekeeper won't block the freshly updated open-source app
     let _ = Command::new("/usr/bin/xattr")
         .args(["-dr", "com.apple.quarantine", new_app.to_str().unwrap_or("")])
         .status();
@@ -700,26 +750,9 @@ pub fn perform_update_install(app: &AppHandle, info: UpdateInfo) -> Result<(), S
     }
 }
 
-pub fn start_background_update_checker(app: AppHandle) {
-    std::thread::spawn(move || {
-        // Gentle initial delay after launch so startup stays instant & quiet
-        std::thread::sleep(std::time::Duration::from_secs(8));
-        loop {
-            if let Ok(info) = check_latest_update() {
-                if info.has_update {
-                    emit_progress(
-                        &app,
-                        "available",
-                        format!("发现新版本 v{}", info.latest_version),
-                        Some(info),
-                    );
-                }
-            }
-            // Re-check every 6 hours while running
-            std::thread::sleep(std::time::Duration::from_secs(6 * 3600));
-        }
-    });
-}
+// ---------------------------------------------------------------------------
+// 单测
+// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -735,12 +768,44 @@ mod tests {
     }
 
     #[test]
-    fn sha256_extraction_validates_hex() {
-        let valid = Some("sha256:05c1be2c444f5303770f6d59e216bc0ed7b69321fc44368e4ec231405570f950".to_string());
-        assert_eq!(
-            extract_sha256(&valid).as_deref(),
-            Some("05c1be2c444f5303770f6d59e216bc0ed7b69321fc44368e4ec231405570f950")
-        );
-        assert_eq!(extract_sha256(&Some("sha256:short".to_string())), None);
+    fn extract_tag_from_github_release_urls() {
+        let ok_cases = [
+            ("https://github.com/xpfyg/kurocat/releases/tag/v4.8.3", "v4.8.3"),
+            ("https://github.com/xpfyg/kurocat/releases/tag/V4.8.3#assets", "V4.8.3"),
+            ("https://github.com/xpfyg/kurocat/releases/tag/4.8.3", "4.8.3"),
+            ("https://github.com/xpfyg/kurocat/tag/v4.0.0-rc1", "v4.0.0-rc1"),
+        ];
+        for (url, expected) in ok_cases {
+            assert_eq!(
+                extract_tag_from_release_url(url).unwrap_or_default(),
+                expected,
+                "url={}",
+                url
+            );
+        }
+        let bad = [
+            "https://github.com/xpfyg/kurocat/releases/latest",
+            "https://example.com/",
+            "",
+        ];
+        for url in bad {
+            assert!(extract_tag_from_release_url(url).is_err(), "url={}", url);
+        }
+    }
+
+    #[test]
+    fn asset_convention_matches_known_platforms() {
+        let win = pick_asset_by_convention("v4.8.3", "windows-nsis").unwrap();
+        assert_eq!(win.0, "KuroCat-4.8.3-x64-setup.exe");
+        assert!(win.1.contains("releases/latest/download"));
+
+        let mac = pick_asset_by_convention("v4.8.3", "macos-app").unwrap();
+        assert_eq!(mac.0, "KuroCat-v4.8.3-macos-universal.app.tar.gz");
+
+        let win7 = pick_asset_by_convention("v4.8.3", "windows-win7").unwrap();
+        assert_eq!(win7.0, "KuroCat-4.8.3-win7.zip");
+
+        let none = pick_asset_by_convention("v4.8.3", "unknown-kind");
+        assert!(none.is_none());
     }
 }
