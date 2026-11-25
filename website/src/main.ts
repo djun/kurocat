@@ -706,6 +706,62 @@ function initMcpCodeTabs(): void {
   });
 }
 
+function initPanModal(): void {
+  const openBtn = document.getElementById('pan-dl-btn');
+  const modal = document.getElementById('pan-modal');
+  const copyBtn = document.getElementById('pan-copy-btn');
+  if (!openBtn || !modal) return;
+
+  const shareText =
+    '我用夸克网盘给你分享了「小猫键盘」，点击链接或复制整段内容，打开「夸克APP」即可获取。\n链接：https://pan.quark.cn/s/d0c3ab148872';
+
+  const close = () => {
+    modal.hidden = true;
+    document.body.style.overflow = '';
+    openBtn.focus();
+  };
+
+  openBtn.addEventListener('click', () => {
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+    modal.querySelector<HTMLButtonElement>('[data-pan-close]')?.focus();
+  });
+
+  modal.querySelectorAll('[data-pan-close]').forEach((el) => {
+    el.addEventListener('click', close);
+  });
+
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) close();
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !modal.hidden) close();
+  });
+
+  copyBtn?.addEventListener('click', async () => {
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(shareText);
+      copied = true;
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = shareText;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      copied = document.execCommand('copy');
+      textarea.remove();
+    }
+    const original = '复制整段文案';
+    copyBtn.textContent = copied ? '已复制 ✓' : '复制失败，请长按链接';
+    window.setTimeout(() => {
+      copyBtn.textContent = original;
+    }, 1800);
+  });
+}
+
 function initPolish(): void {
   // Pointer specular highlight on stage cards
   document.querySelectorAll('.stage-card').forEach((card) => {
@@ -740,6 +796,7 @@ function initPolish(): void {
 applyReleaseUI(DEFAULT_RELEASE_TAG, buildDefaultAssets());
 initPlayground();
 initMcpCodeTabs();
+initPanModal();
 initPolish();
 void syncGithubMetadata();
 void initDownloadStats();
