@@ -180,50 +180,6 @@ jobs:
             echo "Verified Developer ID Application signature"
           fi
 
-      - name: Notarize and staple macOS .app
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          if [[ -z "${APPLE_ID:-}" || -z "${APPLE_PASSWORD:-}" || -z "${APPLE_TEAM_ID:-}" ]]; then
-            echo "::warning::APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID not fully set, skipping notarization"
-            exit 0
-          fi
-          APP_PATH="src-tauri/target/universal-apple-darwin/release/bundle/macos/KuroCat.app"
-          ZIP_PATH="$RUNNER_TEMP/KuroCat-notarize.zip"
-          ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
-
-          SUB_ID="$(xcrun notarytool submit "$ZIP_PATH" \
-            --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" \
-            --output-format json | python3 -c 'import sys,json; print(json.load(sys.stdin).get("id",""))')"
-          echo "Notary submission id: $SUB_ID"
-
-          STATUS=""
-          for attempt in 1 2 3; do
-            xcrun notarytool wait "$SUB_ID" \
-              --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" \
-              --timeout 12m || true
-            STATUS="$(xcrun notarytool info "$SUB_ID" \
-              --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" \
-              --output-format json | python3 -c 'import sys,json; print(json.load(sys.stdin).get("status",""))')"
-            echo "Notary status (attempt $attempt): $STATUS"
-            if [[ "$STATUS" == "Accepted" || "$STATUS" == "Rejected" || "$STATUS" == "Invalid" ]]; then
-              break
-            fi
-            sleep 30
-          done
-
-          if [[ "$STATUS" == "Accepted" ]]; then
-            xcrun stapler staple "$APP_PATH"
-            xcrun stapler validate "$APP_PATH"
-            spctl -a -vv -t exec "$APP_PATH" || true
-          else
-            echo "::warning::App notarization did not reach Accepted (status=$STATUS). Packaging will continue with a signed-but-unnotarized artifact."
-            xcrun notarytool log "$SUB_ID" \
-              --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" 2>&1 | tail -40 || true
-          fi
-
       - name: Package Universal macOS .dmg and .app.tar.gz
         run: |
           TAG="${{ inputs.release_tag }}"
@@ -253,54 +209,19 @@ jobs:
           test -s "KuroCat-${TAG}-macos-universal.app.tar.gz"
           ls -lh "KuroCat-${TAG}-macos-universal.dmg" "KuroCat-${TAG}-macos-universal.app.tar.gz"
 
-      - name: Sign and notarize macOS .dmg
+      - name: Sign macOS .dmg
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           DMG_PATH="$(ls KuroCat-*-macos-universal.dmg | head -n 1)"
           test -f "$DMG_PATH"
-          if [[ -n "${APPLE_SIGNING_IDENTITY:-}" ]]; then
-            codesign --force --sign "$APPLE_SIGNING_IDENTITY" --timestamp "$DMG_PATH"
-            codesign --verify --verbose=2 "$DMG_PATH"
-          else
+          if [[ -z "${APPLE_SIGNING_IDENTITY:-}" ]]; then
             echo "::warning::APPLE_SIGNING_IDENTITY is not set, skipping DMG signing"
-          fi
-          if [[ -z "${APPLE_ID:-}" || -z "${APPLE_PASSWORD:-}" || -z "${APPLE_TEAM_ID:-}" ]]; then
-            echo "::warning::Notarization credentials not fully set, skipping DMG notarization"
             exit 0
           fi
-          SUB_ID="$(xcrun notarytool submit "$DMG_PATH" \
-            --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" \
-            --output-format json | python3 -c 'import sys,json; print(json.load(sys.stdin).get("id",""))')"
-          echo "DMG notary submission id: $SUB_ID"
-
-          STATUS=""
-          for attempt in 1 2 3; do
-            xcrun notarytool wait "$SUB_ID" \
-              --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" \
-              --timeout 12m || true
-            STATUS="$(xcrun notarytool info "$SUB_ID" \
-              --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" \
-              --output-format json | python3 -c 'import sys,json; print(json.load(sys.stdin).get("status",""))')"
-            echo "DMG notary status (attempt $attempt): $STATUS"
-            if [[ "$STATUS" == "Accepted" || "$STATUS" == "Rejected" || "$STATUS" == "Invalid" ]]; then
-              break
-            fi
-            sleep 30
-          done
-
-          if [[ "$STATUS" == "Accepted" ]]; then
-            xcrun stapler staple "$DMG_PATH"
-            xcrun stapler validate "$DMG_PATH"
-            spctl -a -t open --context context:primary-signature -vv "$DMG_PATH" || true
-          else
-            echo "::warning::DMG notarization did not reach Accepted (status=$STATUS). Uploading signed-but-unnotarized DMG."
-            xcrun notarytool log "$SUB_ID" \
-              --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" 2>&1 | tail -40 || true
-          fi
+          codesign --force --sign "$APPLE_SIGNING_IDENTITY" --timestamp "$DMG_PATH"
+          codesign --verify --verbose=2 "$DMG_PATH"
+          spctl -a -t open --context context:primary-signature -vv "$DMG_PATH" || true
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
